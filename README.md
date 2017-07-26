@@ -12,7 +12,7 @@ NOTES:
 ## Usage:
 
 ```
-clean_registry.py [OPTIONS] CONTAINER [REPOSITORY[:TAG]]...`
+clean_registry.py [OPTIONS] CONTAINER [REPOSITORY[:TAG]]...
 Options:
         -x, --remove    Remove the specified images or repositories.
         -q, --quiet     Supress non-error messages.
