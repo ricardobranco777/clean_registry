@@ -5,7 +5,7 @@ The optional `-x` flag may be used to remove the specified repositories or tagge
 
 NOTES:
   - This script stops the Registry container during cleanup to prevent corruption, making it temporarily unavailable to clients.
-  - This script assumes local storage (the filesystem storage driver).
+  - This script assumes local storage (the **filesystem** storage driver).
   - This script may run standalone or dockerized.  To run standalone, you must install **docker-py** with `pip3 install docker` and **pyyaml** with `pip3 install pyyaml`.
   - This script is Python 3 only.
   
@@ -21,4 +21,4 @@ Options:
 
 ## Docker usage:
 
-`docker run --rm --volumes-from CONTAINER ricardobranco/clean_registry [OPTIONS] CONTAINER [REPOSITORY[:TAG]]...`
+`docker run --rm --volumes-from CONTAINER -v /var/run/docker.sock:/var/run/docker.sock ricardobranco/clean_registry [OPTIONS] CONTAINER [REPOSITORY[:TAG]]...`
