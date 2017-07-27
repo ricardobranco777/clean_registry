@@ -6,7 +6,9 @@ The optional `-x` flag may be used to remove the specified repositories or tagge
 NOTES:
   - This script stops the Registry container during cleanup to prevent corruption, making it temporarily unavailable to clients.
   - This script assumes local storage (the **filesystem** storage driver).
-  - This script may run stand-alone or dockerized.  To run stand-alone, you must install **docker-py** and **pyyaml** with `pip3 install docker pyyaml`.
+  - This script may run stand-alone or dockerized.  To run stand-alone, you must install **docker-py** and **pyyaml** with
+  
+  `pip3 install docker pyyaml`.
   - We do not use the [Docker Distribution API](https://github.com/docker/distribution/blob/master/docs/spec/api.md) because it lacks the support for removing tags.  Also, we don't want to mess with authentication details.
   
 ## Usage:
