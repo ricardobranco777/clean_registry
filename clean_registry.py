@@ -11,7 +11,7 @@
 #   - This script may run stand-alone (on local setups) or dockerized (which supports remote Docker setups).
 #   - This script is Python 3 only.
 #
-# v1.0.1 by Ricardo Branco
+# v1.0.2 by Ricardo Branco
 #
 # MIT License
 #
@@ -28,7 +28,7 @@ from glob import iglob
 from io import BytesIO
 from shutil import rmtree
 from requests import exceptions
-from docker.errors import APIError, NotFound
+from docker.errors import APIError, NotFound, TLSParameterError
 
 try:
     import docker
@@ -40,7 +40,7 @@ try:
 except ImportError:
     error("Please install PyYaml with: pip3 install pyyaml")
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 
 
 def dockerized():
@@ -145,18 +145,16 @@ def check_name(image):
 class RegistryCleaner():
     '''Simple callable class for Docker Registry cleaning duties'''
     def __init__(self, container_name):
-        if not dockerized():
-            env_vars = ('DOCKER_HOST', 'DOCKER_TLS_VERIFY', 'DOCKER_CERT_PATH')
-            if any(var for var in env_vars if var in os.environ):
-                error("Do not run this script stand-alone using a remote Docker setup")
-
-        self.docker = docker.from_env()
+        try:
+            self.docker = docker.from_env()
+        except TLSParameterError as err:
+            error(err)
 
         try:
             self.info = self.docker.api.inspect_container(container_name)
             self.container = self.info['Id']
         except (APIError, exceptions.ConnectionError) as err:
-            error(str(err))
+            error(err)
 
         if self.info['Config']['Image'] != "registry:2":
             error("The container %s is not running the registry:2 image" % (container_name))
