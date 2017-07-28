@@ -11,7 +11,7 @@
 #   - This script may run stand-alone (on local setups) or dockerized (which supports remote Docker setups).
 #   - This script is Python 3 only.
 #
-# v1.0.2 by Ricardo Branco
+# v1.1 by Ricardo Branco
 #
 # MIT License
 #
@@ -40,7 +40,7 @@ try:
 except ImportError:
     error("Please install PyYaml with: pip3 install pyyaml")
 
-VERSION = "1.0.2"
+VERSION = "1.1"
 
 
 def dockerized():
@@ -144,35 +144,50 @@ def check_name(image):
 
 class RegistryCleaner():
     '''Simple callable class for Docker Registry cleaning duties'''
-    def __init__(self, container_name):
+    def __init__(self, container=None, volume=None):
         try:
             self.docker = docker.from_env()
         except TLSParameterError as err:
             error(err)
 
+        if container is None:
+            self.container = None
+            try:
+                self.volume = self.docker.volumes.get(volume)
+                self.registry_dir = self.volume.attrs['Mountpoint']
+            except (APIError, exceptions.ConnectionError) as err:
+                error(err)
+            if dockerized():
+                if not os.getenv("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"):
+                    os.environ['REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY'] = "/var/lib/registry"
+                self.registry_dir = os.environ['REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY']
+            return
+
         try:
-            self.info = self.docker.api.inspect_container(container_name)
+            self.info = self.docker.api.inspect_container(container)
             self.container = self.info['Id']
         except (APIError, exceptions.ConnectionError) as err:
             error(err)
 
         if self.info['Config']['Image'] != "registry:2":
-            error("The container %s is not running the registry:2 image" % (container_name))
+            error("The container %s is not running the registry:2 image" % (container))
 
         if LooseVersion(self.get_image_version()) < LooseVersion("v2.4.0"):
             error("You're not running Docker Registry 2.4.0+")
 
         self.registry_dir = self.get_registry_dir()
-        try:
-            os.chdir(self.registry_dir + "/docker/registry/v2/repositories")
-        except FileNotFoundError as err:
-            error(err)
 
         if dockerized() and not os.getenv("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"):
             os.environ['REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY'] = self.registry_dir
 
     def __call__(self):
-        self.docker.api.stop(self.container)
+        try:
+            os.chdir(self.registry_dir + "/docker/registry/v2/repositories")
+        except FileNotFoundError as err:
+            error(err)
+
+        if self.container is not None:
+            self.docker.api.stop(self.container)
 
         images = args.images if args.images else os.listdir(".")
 
@@ -184,7 +199,8 @@ class RegistryCleaner():
         if not self.garbage_collect():
             rc = 1
 
-        self.docker.api.start(self.container)
+        if self.container is not None:
+            self.docker.api.start(self.container)
         return rc
 
     def get_file(self, filename):
@@ -258,9 +274,10 @@ class RegistryCleaner():
 def main():
     '''Main function'''
     progname = os.path.basename(sys.argv[0])
-    usage = "\rUsage: " + progname + " [OPTIONS] CONTAINER [REPOSITORY[:TAG]]..." + """
+    usage = "\rUsage: " + progname + " [OPTIONS] VOLUME|CONTAINER [REPOSITORY[:TAG]]..." + """
 Options:
         -x, --remove    Remove the specified images or repositories.
+        -v, --volume    Specify a volume instead of container.
         -q, --quiet     Supress non-error messages.
         -V, --version   Show version and exit."""
 
@@ -268,8 +285,9 @@ Options:
     parser.add_argument('-h', '--help', action='store_true')
     parser.add_argument('-q', '--quiet', action='store_true')
     parser.add_argument('-x', '--remove', action='store_true')
+    parser.add_argument('-v', '--volume', action='store_true')
     parser.add_argument('-V', '--version', action='store_true')
-    parser.add_argument('container')
+    parser.add_argument('container_or_volume')
     parser.add_argument('images', nargs='*')
     global args
     args = parser.parse_args()
@@ -288,7 +306,11 @@ Options:
     if args.remove and not args.images:
         error("The -x option requires that you specify at least one repository...")
 
-    rc = RegistryCleaner(args.container)
+    if args.volume:
+        rc = RegistryCleaner(volume=args.container_or_volume)
+    else:
+        rc = RegistryCleaner(container=args.container_or_volume)
+
     sys.exit(rc())
 
 if __name__ == "__main__":
