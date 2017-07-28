@@ -287,14 +287,14 @@ Options:
     parser.add_argument('-x', '--remove', action='store_true')
     parser.add_argument('-v', '--volume', action='store_true')
     parser.add_argument('-V', '--version', action='store_true')
-    parser.add_argument('container_or_volume')
+    parser.add_argument('container_or_volume', nargs='?')
     parser.add_argument('images', nargs='*')
     global args
     args = parser.parse_args()
 
-    if args.help:
+    if args.help or not args.container_or_volume:
         print('usage: ' + usage)
-        sys.exit(0)
+        sys.exit(0 if args.help else 1)
     elif args.version:
         print(progname + " " + VERSION)
         sys.exit(0)
