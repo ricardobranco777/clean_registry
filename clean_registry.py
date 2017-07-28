@@ -245,7 +245,7 @@ class RegistryCleaner():
                     print(proc.stdout.read().decode('utf-8'))
             status = proc.wait()
         else:
-            cli = self.docker.containers.run("registry:2", command=command, detach=True,
+            cli = self.docker.containers.run("registry:2", command=command, detach=True, stderr=True,
                                              volumes={self.registry_dir: {'bind': "/var/lib/registry", 'mode': "rw"}})
             if not args.quiet:
                 for line in cli.logs(stream=True):
