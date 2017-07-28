@@ -20,6 +20,12 @@ Options:
         -V, --version   Show version and exit.
 ```
 
-## Docker usage:
+## Docker usage with local Docker setup
 
 `docker run --rm --volumes-from CONTAINER -v /var/run/docker.sock:/var/run/docker.sock ricardobranco/clean_registry [OPTIONS] CONTAINER [REPOSITORY[:TAG]]...`
+
+## Docker usage with [remote Docker setup](https://docs.docker.com/engine/security/https/#secure-by-default)
+
+`docker run --rm --volumes-from CONTAINER -e DOCKER_HOST -e DOCKER_TLS_VERIFY=1 -v /root/.docker:/root/.docker ricardobranco/clean_registry [OPTIONS] CONTAINER [REPOSITORY[:TAG]]...`
+
+Note: Paths other than `/root/.docker` path may be specified with the **DOCKER_CERT_PATH** environment variable.  In any case, your `~/.docker/*.pem` files should be in the server to be able to run as a client against itself.
