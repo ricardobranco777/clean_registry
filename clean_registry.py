@@ -2,16 +2,16 @@
 #
 # This script purges untagged repositories and runs the garbage collector in Docker Registry >= 2.4.0.
 # It works on the whole registry or the specified repositories.
-# The optional flag -x may be used to completely remove the specified repositories or tagged images.
+# The optional -x flag may be used to completely remove the specified repositories or tagged images.
 #
 # NOTES:
 #   - This script stops the Registry container during cleanup to prevent corruption,
 #     making it temporarily unavailable to clients.
 #   - This script assumes local storage (the filesystem storage driver).
-#   - This script may run standalone or dockerized.
+#   - This script may run stand-alone (on local setups) or dockerized (which supports remote Docker setups).
 #   - This script is Python 3 only.
 #
-# v1.0 by Ricardo Branco
+# v1.0.1 by Ricardo Branco
 #
 # MIT License
 #
@@ -40,7 +40,7 @@ try:
 except ImportError:
     error("Please install PyYaml with: pip3 install pyyaml")
 
-VERSION = "1.0"
+VERSION = "1.0.1"
 
 
 def dockerized():
@@ -145,6 +145,11 @@ def check_name(image):
 class RegistryCleaner():
     '''Simple callable class for Docker Registry cleaning duties'''
     def __init__(self, container_name):
+        if not dockerized():
+            env_vars = ('DOCKER_HOST', 'DOCKER_TLS_VERIFY', 'DOCKER_CERT_PATH')
+            if any(var for var in env_vars if var in os.environ):
+                error("Do not run this script stand-alone using a remote Docker setup")
+
         self.docker = docker.from_env()
 
         try:
