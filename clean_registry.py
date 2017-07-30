@@ -11,7 +11,7 @@
 #   - This script may run stand-alone (on local setups) or dockerized (which supports remote Docker setups).
 #   - This script is Python 3 only.
 #
-# v1.1 by Ricardo Branco
+# v1.2 by Ricardo Branco
 #
 # MIT License
 #
@@ -40,7 +40,7 @@ try:
 except ImportError:
     error("Please install PyYaml with: pip3 install pyyaml")
 
-VERSION = "1.1"
+VERSION = "1.2"
 
 
 def dockerized():
@@ -189,7 +189,7 @@ class RegistryCleaner():
         if self.container is not None:
             self.docker.api.stop(self.container)
 
-        images = args.images if args.images else os.listdir(".")
+        images = args.images if args.images else map(os.path.dirname, iglob("**/_manifests", recursive=True))
 
         rc = 0
         for image in images:
