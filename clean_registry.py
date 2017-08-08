@@ -41,6 +41,7 @@ except ImportError:
     error("Please install PyYaml with: pip3 install pyyaml")
 
 VERSION = "1.2"
+REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
 
 
 def dockerized():
@@ -158,9 +159,10 @@ class RegistryCleaner():
             except (APIError, exceptions.ConnectionError) as err:
                 error(err)
             if dockerized():
-                if not os.getenv("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"):
-                    os.environ['REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY'] = "/var/lib/registry"
-                self.registry_dir = os.environ['REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY']
+                try:
+                    self.registry_dir = os.environ[REGISTRY_DIR]
+                except KeyError:
+                    self.registry_dir = "/var/lib/registry"
             return
 
         try:
@@ -177,8 +179,8 @@ class RegistryCleaner():
 
         self.registry_dir = self.get_registry_dir()
 
-        if dockerized() and not os.getenv("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"):
-            os.environ['REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY'] = self.registry_dir
+        if dockerized():
+            os.environ[REGISTRY_DIR] = self.registry_dir
 
     def __call__(self):
         try:
@@ -206,8 +208,8 @@ class RegistryCleaner():
     def get_file(self, filename):
         '''Returns the contents of the specified file from the container'''
         try:
-            with self.docker.api.get_archive(self.container, filename)[0] as tar_stream:
-                with BytesIO(tar_stream.data) as buf:
+            with self.docker.api.get_archive(self.container, filename)[0] as tar:
+                with BytesIO(tar.data) as buf:
                     with tarfile.open(fileobj=buf) as tarf:
                         with tarf.extractfile(os.path.basename(filename)) as f:
                             data = f.read()
@@ -217,14 +219,13 @@ class RegistryCleaner():
 
     def get_registry_dir(self):
         '''Gets the Registry directory'''
-        registry_dir = os.getenv("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY")
+        registry_dir = os.getenv(REGISTRY_DIR)
         if registry_dir:
             return registry_dir
 
-        registry_dir = ""
         for env in self.info['Config']['Env']:
             var, value = env.split("=", 1)
-            if var == "REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY":
+            if var == REGISTRY_DIR:
                 registry_dir = value
                 break
 
@@ -246,10 +247,10 @@ class RegistryCleaner():
     def get_image_version(self):
         '''Gets the Docker distribution version running on the container'''
         if self.info['State']['Running']:
-            data = self.docker.containers.get(self.container).exec_run("/bin/registry --version").decode('utf-8')
+            data = self.docker.containers.get(self.container).exec_run("/bin/registry --version")
         else:
-            data = self.docker.containers.run(self.info["Image"], command="--version", remove=True).decode('utf-8')
-        return data.split()[2]
+            data = self.docker.containers.run(self.info["Image"], command="--version", remove=True)
+        return data.decode('utf-8').split()[2]
 
     def garbage_collect(self):
         '''Runs garbage-collect'''
