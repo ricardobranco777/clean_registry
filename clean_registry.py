@@ -235,7 +235,8 @@ class RegistryCleaner():
             try:
                 registry_dir = data['storage']['filesystem']['rootdirectory']
             except KeyError:
-                error("Unsupported storage driver")
+                driver = [k for k in 'azure gcs inmemory oss s3 swift'.split() if k in data['storage']][0]
+                error("Unsupported storage driver: " + driver)
 
         if dockerized():
             return registry_dir
