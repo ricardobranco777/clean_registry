@@ -1,4 +1,4 @@
-FROM	registry:2.6.2
+FROM	registry:2
 
 RUN	apk --no-cache add python3 python3-dev
 
