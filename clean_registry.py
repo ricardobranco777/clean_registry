@@ -21,6 +21,8 @@ import re
 import sys
 import tarfile
 import subprocess
+import yaml
+import docker
 
 from argparse import ArgumentParser
 from distutils.version import LooseVersion
@@ -29,16 +31,6 @@ from io import BytesIO
 from shutil import rmtree
 from requests import exceptions
 from docker.errors import APIError, NotFound, TLSParameterError
-
-try:
-    import docker
-except ImportError:
-    error("Please install docker-py with: pip3 install docker")
-
-try:
-    import yaml
-except ImportError:
-    error("Please install PyYaml with: pip3 install pyyaml")
 
 VERSION = "1.2"
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
