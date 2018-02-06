@@ -11,7 +11,7 @@
 #   - This script may run stand-alone (on local setups) or dockerized (which supports remote Docker setups).
 #   - This script is Python 3 only.
 #
-# v1.2 by Ricardo Branco
+# v1.2.1 by Ricardo Branco
 #
 # MIT License
 #
@@ -32,7 +32,7 @@ from shutil import rmtree
 from requests import exceptions
 from docker.errors import APIError, NotFound, TLSParameterError
 
-VERSION = "1.2"
+VERSION = "1.2.1"
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
 
 
@@ -200,11 +200,12 @@ class RegistryCleaner():
     def get_file(self, filename):
         '''Returns the contents of the specified file from the container'''
         try:
-            with self.docker.api.get_archive(self.container, filename)[0] as tar:
-                with BytesIO(tar.data) as buf:
-                    with tarfile.open(fileobj=buf) as tarf:
-                        with tarf.extractfile(os.path.basename(filename)) as f:
-                            data = f.read()
+            archive = self.docker.api.get_archive(self.container, filename)[0]
+            binary = b"".join(chunk for chunk in archive)
+            with BytesIO(binary) as buf:
+                with tarfile.open(fileobj=buf) as tar:
+                    with tar.extractfile(os.path.basename(filename)) as f:
+                        data = f.read()
         except NotFound as err:
             error(err)
         return data
@@ -240,7 +241,7 @@ class RegistryCleaner():
     def get_image_version(self):
         '''Gets the Docker distribution version running on the container'''
         if self.info['State']['Running']:
-            data = self.docker.containers.get(self.container).exec_run("/bin/registry --version")
+            data = self.docker.containers.get(self.container).exec_run("/bin/registry --version")[0]
         else:
             data = self.docker.containers.run(self.info["Image"], command="--version", remove=True)
         return data.decode('utf-8').split()[2]
@@ -260,7 +261,7 @@ class RegistryCleaner():
             if not args.quiet:
                 for line in cli.logs(stream=True):
                     print(line.decode('utf-8'), end="")
-            status = True if cli.wait() == 0 else False
+            status = True if cli.wait()['StatusCode'] == 0 else False
             cli.remove()
         return status
 
