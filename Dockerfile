@@ -2,7 +2,7 @@ FROM	registry:2
 
 RUN	apk --no-cache add python3 python3-dev
 
-RUN	pip3 install --no-cache-dir docker docker[tls] pyyaml
+RUN	pip3 install --no-cache-dir docker==2.7.0 docker[tls] pyyaml
 
 COPY	clean_registry.py /usr/local/bin/clean_registry.py
 
