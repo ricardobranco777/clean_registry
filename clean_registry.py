@@ -1,28 +1,26 @@
 #!/usr/bin/env python3
-#
-# This script purges untagged repositories and runs the garbage collector in Docker Registry >= 2.4.0.
-# It works on the whole registry or the specified repositories.
-# The optional -x flag may be used to completely remove the specified repositories or tagged images.
-#
-# NOTES:
-#   - This script stops the Registry container during cleanup to prevent corruption,
-#     making it temporarily unavailable to clients.
-#   - This script assumes local storage (the filesystem storage driver).
-#   - This script may run stand-alone (on local setups) or dockerized (which supports remote Docker setups).
-#   - This script is Python 3 only.
-#
-# v1.2.1 by Ricardo Branco
-#
-# MIT License
-#
+"""
+This script purges untagged repositories and runs the garbage collector in Docker Registry >= 2.4.0.
+It works on the whole registry or the specified repositories.
+The optional -x flag may be used to completely remove the specified repositories or tagged images.
+
+NOTES:
+  - This script stops the Registry container during cleanup to prevent corruption,
+    making it temporarily unavailable to clients.
+  - This script assumes local storage (the filesystem storage driver).
+  - This script may run stand-alone (on local setups) or dockerized (which supports remote Docker setups).
+  - This script is Python 3 only.
+
+v1.2.1 by Ricardo Branco
+
+MIT License
+"""
 
 import os
 import re
 import sys
 import tarfile
 import subprocess
-import yaml
-import docker
 
 from argparse import ArgumentParser
 from distutils.version import LooseVersion
@@ -30,7 +28,11 @@ from glob import iglob
 from io import BytesIO
 from shutil import rmtree
 from requests import exceptions
+
+import docker
 from docker.errors import APIError, NotFound, TLSParameterError
+
+import yaml
 
 VERSION = "1.2.1"
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
@@ -41,10 +43,10 @@ def dockerized():
     return os.path.isfile("/.dockerenv")
 
 
-def error(msg, Exit=True):
+def error(msg, bye=True):
     '''Prints an error message and optionally exit with a status code of 1'''
     print("ERROR: " + str(msg), file=sys.stderr)
-    if Exit:
+    if bye:
         sys.exit(1)
 
 
@@ -68,13 +70,13 @@ def clean_tag(repo, tag):
     '''Clean a specific repo:tag'''
     link = repo + "/_manifests/tags/" + tag + "/current/link"
     if not os.path.isfile(link):
-        error("No such tag: %s in repository %s" % (tag, repo), Exit=False)
+        error("No such tag: %s in repository %s" % (tag, repo), bye=False)
         return False
     if args.remove:
         remove(repo + "/_manifests/tags/" + tag)
     else:
-        with open(link) as f:
-            current = f.read()[len("sha256:"):]
+        with open(link) as infile:
+            current = infile.read()[len("sha256:"):]
         path = repo + "/_manifests/tags/" + tag + "/index/sha256/"
         for index in os.listdir(path):
             if index == current:
@@ -89,7 +91,7 @@ def clean_repo(image):
     repo, tag = image.split(":", 1) if ":" in image else (image, "")
 
     if not os.path.isdir(repo):
-        error("No such repository: " + repo, Exit=False)
+        error("No such repository: " + repo, bye=False)
         return False
 
     if args.remove:
@@ -103,8 +105,8 @@ def clean_repo(image):
 
     currents = set()
     for link in iglob(repo + "/_manifests/tags/*/current/link"):
-        with open(link) as f:
-            currents.add(f.read()[len("sha256:"):])
+        with open(link) as infile:
+            currents.add(infile.read()[len("sha256:"):])
     for index in iglob(repo + "/_manifests/tags/*/index/sha256/*"):
         if os.path.basename(index) not in currents:
             remove(index)
@@ -185,27 +187,27 @@ class RegistryCleaner():
 
         images = args.images if args.images else map(os.path.dirname, iglob("**/_manifests", recursive=True))
 
-        rc = 0
+        exit_status = 0
         for image in images:
             if not clean_repo(image):
-                rc = 1
+                exit_status = 1
 
         if not self.garbage_collect():
-            rc = 1
+            exit_status = 1
 
         if self.container is not None:
             self.docker.api.start(self.container)
-        return rc
+        return exit_status
 
-    def get_file(self, filename):
+    def get_file(self, path):
         '''Returns the contents of the specified file from the container'''
         try:
-            archive = self.docker.api.get_archive(self.container, filename)[0]
-            binary = b"".join(chunk for chunk in archive)
-            with BytesIO(binary) as buf:
+            with BytesIO(
+                b"".join(_ for _ in self.docker.api.get_archive(self.container, path)[0])
+            ) as buf:
                 with tarfile.open(fileobj=buf) as tar:
-                    with tar.extractfile(os.path.basename(filename)) as f:
-                        data = f.read()
+                    with tar.extractfile(os.path.basename(path)) as infile:
+                        data = infile.read()
         except NotFound as err:
             error(err)
         return data
@@ -302,11 +304,11 @@ Options:
         error("The -x option requires that you specify at least one repository...")
 
     if args.volume:
-        rc = RegistryCleaner(volume=args.container_or_volume)
+        cleaner = RegistryCleaner(volume=args.container_or_volume)
     else:
-        rc = RegistryCleaner(container=args.container_or_volume)
+        cleaner = RegistryCleaner(container=args.container_or_volume)
 
-    sys.exit(rc())
+    sys.exit(cleaner())
 
 if __name__ == "__main__":
     try:
