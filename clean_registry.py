@@ -204,10 +204,8 @@ class RegistryCleaner():
         try:
             with BytesIO(
                 b"".join(_ for _ in self.docker.api.get_archive(self.container, path)[0])
-            ) as buf:
-                with tarfile.open(fileobj=buf) as tar:
-                    with tar.extractfile(os.path.basename(path)) as infile:
-                        data = infile.read()
+            ) as buf, tarfile.open(fileobj=buf) as tar, tar.extractfile(os.path.basename(path)) as infile:
+                data = infile.read()
         except NotFound as err:
             error(err)
         return data
