@@ -5,7 +5,7 @@ The optional ``-x`` flag may be used to remove the specified repositories or tag
 
 # WARNING:
 
-Make backups of target docker-registry/containers/tags to avoid loosing data.
+Make backups of target docker-registry to avoid losing data.
 
 This script stops the Registry container during cleanup to prevent corruption, making it temporarily unavailable to clients.
 
@@ -50,4 +50,4 @@ docker run --rm --volumes-from CONTAINER -e DOCKER_HOST -e DOCKER_TLS_VERIFY=1 -
 
 Note:
 
-Paths other than ``/root/.docker`` path may be specified with the ``**DOCKER_CERT_PATH**`` environment variable.  In any case, your ``~/.docker/*.pem`` files should be in the server to be able to run as a client against itself.
+Paths other than ``/root/.docker`` path may be specified with the ``DOCKER_CERT_PATH`` environment variable.  In any case, your ``~/.docker/*.pem`` files should be in the server to be able to run as a client against itself.
