@@ -261,7 +261,7 @@ class RegistryCleaner():
             if not args.quiet:
                 for line in cli.logs(stream=True):
                     print(line.decode('utf-8'), end="")
-            status = True if cli.wait()['StatusCode'] == 0 else False
+            status = bool(cli.wait()['StatusCode'] == 0)
             cli.remove()
         return status
 
