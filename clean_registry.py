@@ -185,7 +185,7 @@ class RegistryCleaner():
         if self.container is not None:
             self.docker.api.stop(self.container)
 
-        images = args.images if args.images else map(os.path.dirname, iglob("**/_manifests", recursive=True))
+        images = args.images or map(os.path.dirname, iglob("**/_manifests", recursive=True))
 
         exit_status = 0
         for image in images:
