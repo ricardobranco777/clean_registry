@@ -11,7 +11,7 @@ NOTES:
   - This script may run stand-alone (on local setups) or dockerized (which supports remote Docker setups).
   - This script is Python 3 only.
 
-v1.2.1 by Ricardo Branco
+v1.2.2 by Ricardo Branco
 
 MIT License
 """
@@ -34,7 +34,7 @@ from docker.errors import APIError, NotFound, TLSParameterError
 
 import yaml
 
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
 
 
@@ -241,7 +241,7 @@ class RegistryCleaner():
     def get_image_version(self):
         '''Gets the Docker distribution version running on the container'''
         if self.info['State']['Running']:
-            data = self.docker.containers.get(self.container).exec_run("/bin/registry --version")[0]
+            data = self.docker.containers.get(self.container).exec_run("/bin/registry --version").output
         else:
             data = self.docker.containers.run(self.info["Image"], command="--version", remove=True)
         return data.decode('utf-8').split()[2]
