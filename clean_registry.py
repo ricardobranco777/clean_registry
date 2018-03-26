@@ -287,12 +287,15 @@ Options:
     global args
     args = parser.parse_args()
 
-    if args.help or not args.container_or_volume:
+    if args.help:
         print('usage: ' + usage)
-        sys.exit(0 if args.help else 1)
+        sys.exit(0)
     elif args.version:
         print(progname + " " + VERSION)
         sys.exit(0)
+    elif not args.container_or_volume:
+        print('usage: ' + usage)
+        sys.exit(1)
 
     for image in args.images:
         if not check_name(image):
