@@ -2,7 +2,7 @@ backports.ssl-match-hostname==3.5.0.1
 backports.weakref==1.0.post1
 certifi==2018.1.18
 chardet==3.0.4
-docker==3.1.0
+docker==3.2.1
 docker-pycreds==0.2.2
 idna==2.6
 pkg-resources==0.0.0

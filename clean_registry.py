@@ -197,6 +197,8 @@ class RegistryCleaner():
 
         if self.container is not None:
             self.docker.api.start(self.container)
+            self.docker.close()
+
         return exit_status
 
     def get_file(self, path):
