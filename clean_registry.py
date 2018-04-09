@@ -11,7 +11,7 @@ NOTES:
   - This script may run stand-alone (on local setups) or dockerized (which supports remote Docker setups).
   - This script is Python 3 only.
 
-v1.2.2 by Ricardo Branco
+v1.3 by Ricardo Branco
 
 MIT License
 """
@@ -34,7 +34,7 @@ from docker.errors import APIError, NotFound, TLSParameterError
 
 import yaml
 
-VERSION = "1.2.2"
+VERSION = "1.3"
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
 
 
@@ -82,7 +82,7 @@ def clean_tag(repo, tag):
             if index == current:
                 continue
             remove(path + index)
-        clean_revisions(repo)
+    clean_revisions(repo)
     return True
 
 
