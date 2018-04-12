@@ -11,7 +11,7 @@ NOTES:
   - This script may run stand-alone (on local setups) or dockerized (which supports remote Docker setups).
   - This script is Python 3 only.
 
-v1.3 by Ricardo Branco
+v1.3.1 by Ricardo Branco
 
 MIT License
 """
@@ -34,7 +34,7 @@ from docker.errors import APIError, NotFound, TLSParameterError
 
 import yaml
 
-VERSION = "1.3"
+VERSION = "1.3.1"
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
 
 
@@ -197,8 +197,8 @@ class RegistryCleaner():
 
         if self.container is not None:
             self.docker.api.start(self.container)
-            self.docker.close()
 
+        self.docker.close()
         return exit_status
 
     def get_file(self, path):
