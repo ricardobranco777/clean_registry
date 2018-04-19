@@ -1,8 +1,22 @@
 FROM	registry:2
 
-RUN	apk --no-cache add python3 python3-dev
+COPY	requirements.txt /tmp
 
-RUN	pip3 install --no-cache-dir docker docker[tls] pyyaml
+RUN	apk --no-cache add \
+		gcc \
+		libc-dev \
+		libffi-dev \
+		openssl-dev \
+		python3-dev \
+		python3 && \
+	pip3 install --no-cache-dir --upgrade pip && \
+	pip3 install --no-cache-dir -r /tmp/requirements.txt && \
+	apk del \
+		gcc \
+		libc-dev \
+		libffi-dev \
+		openssl-dev \
+		python3-dev
 
 COPY	clean_registry.py /usr/local/bin/clean_registry.py
 
