@@ -4,7 +4,7 @@ backports.weakref==1.0.post1
 certifi==2018.4.16
 cffi==1.11.5
 chardet==3.0.4
-cryptography==2.2.2
+cryptography==2.3
 docker==3.3.0
 docker-pycreds==0.2.2
 idna==2.6
