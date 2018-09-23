@@ -36,6 +36,7 @@ import yaml
 
 VERSION = "1.3.1"
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
+args = None
 
 
 def dockerized():
@@ -59,8 +60,12 @@ def remove(path):
 
 def clean_revisions(repo):
     '''Remove the revision manifests that are not present in the tags directory'''
-    revisions = set(os.listdir(repo + "/_manifests/revisions/sha256/"))
-    manifests = set(map(os.path.basename, iglob(repo + "/_manifests/tags/*/*/sha256/*")))
+    revisions = set(
+        os.listdir(repo + "/_manifests/revisions/sha256/")
+    )
+    manifests = set(
+        map(os.path.basename, iglob(repo + "/_manifests/tags/*/*/sha256/*"))
+    )
     revisions.difference_update(manifests)
     for revision in revisions:
         remove(repo + "/_manifests/revisions/sha256/" + revision)
@@ -133,8 +138,12 @@ def check_name(image):
     # Note: Internally, distribution permits multiple dashes and up to 2 underscores as separators.
     # See https://github.com/docker/distribution/blob/master/reference/regexp.go
 
-    return len(image) < 256 and len(tag) < 129 and re.match('[a-zA-Z0-9_][a-zA-Z0-9_.-]*$', tag) and \
-           all(re.match('[a-z0-9]+(?:(?:[._]|__|[-]*)[a-z0-9]+)*$', path) for path in repo.split("/"))
+    return len(image) < 256 and len(tag) < 129 and \
+        re.match('[a-zA-Z0-9_][a-zA-Z0-9_.-]*$', tag) and \
+        all(
+            re.match('[a-z0-9]+(?:(?:[._]|__|[-]*)[a-z0-9]+)*$', path)
+            for path in repo.split("/")
+        )
 
 
 class RegistryCleaner():
@@ -185,7 +194,8 @@ class RegistryCleaner():
         if self.container is not None:
             self.docker.api.stop(self.container)
 
-        images = args.images or map(os.path.dirname, iglob("**/_manifests", recursive=True))
+        images = args.images or \
+            map(os.path.dirname, iglob("**/_manifests", recursive=True))
 
         exit_status = 0
         for image in images:
@@ -204,9 +214,11 @@ class RegistryCleaner():
     def get_file(self, path):
         '''Returns the contents of the specified file from the container'''
         try:
-            with BytesIO(
-                b"".join(_ for _ in self.docker.api.get_archive(self.container, path)[0])
-            ) as buf, tarfile.open(fileobj=buf) as tar, tar.extractfile(os.path.basename(path)) as infile:
+            with BytesIO(b"".join(
+                    _ for _ in self.docker.api.get_archive(self.container, path)[0]
+            )) as buf, tarfile.open(fileobj=buf) \
+                    as tar, tar.extractfile(os.path.basename(path)) \
+                    as infile:
                 data = infile.read()
         except NotFound as err:
             error(err)
@@ -230,7 +242,10 @@ class RegistryCleaner():
             try:
                 registry_dir = data['storage']['filesystem']['rootdirectory']
             except KeyError:
-                driver = [k for k in 'azure gcs inmemory oss s3 swift'.split() if k in data['storage']][0]
+                driver = [
+                    _ for _ in 'azure gcs inmemory oss s3 swift'.split()
+                    if _ in data['storage']
+                ][0]
                 error("Unsupported storage driver: " + driver)
 
         if dockerized():
@@ -239,13 +254,18 @@ class RegistryCleaner():
         for item in self.info['Mounts']:
             if item['Destination'] == registry_dir:
                 return item['Source']
+        return None
 
     def get_image_version(self):
         '''Gets the Docker distribution version running on the container'''
         if self.info['State']['Running']:
-            data = self.docker.containers.get(self.container).exec_run("/bin/registry --version").output
+            data = self.docker.containers.get(
+                self.container
+            ).exec_run("/bin/registry --version").output
         else:
-            data = self.docker.containers.run(self.info["Image"], command="--version", remove=True)
+            data = self.docker.containers.run(
+                self.info["Image"], command="--version", remove=True
+            )
         return data.decode('utf-8').split()[2]
 
     def garbage_collect(self):
@@ -253,13 +273,27 @@ class RegistryCleaner():
         command = "garbage-collect " + "/etc/docker/registry/config.yml"
         if dockerized():
             command = "/bin/registry " + command
-            with subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as proc:
+            with subprocess.Popen(
+                    command.split(),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT
+            ) as proc:
                 if not args.quiet:
                     print(proc.stdout.read().decode('utf-8'))
             status = proc.wait()
         else:
-            cli = self.docker.containers.run("registry:2", command=command, detach=True, stderr=True,
-                                             volumes={self.registry_dir: {'bind': "/var/lib/registry", 'mode': "rw"}})
+            cli = self.docker.containers.run(
+                "registry:2",
+                command=command,
+                detach=True,
+                stderr=True,
+                volumes={
+                    self.registry_dir: {
+                        'bind': "/var/lib/registry",
+                        'mode': "rw"
+                    }
+                }
+            )
             if not args.quiet:
                 for line in cli.logs(stream=True):
                     print(line.decode('utf-8'), end="")
@@ -312,6 +346,7 @@ Options:
         cleaner = RegistryCleaner(container=args.container_or_volume)
 
     sys.exit(cleaner())
+
 
 if __name__ == "__main__":
     try:
