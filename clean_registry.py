@@ -39,6 +39,9 @@ REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
 args = None
 
 
+os.environ['LC_ALL'] = 'C.UTF-8'
+
+
 def dockerized():
     '''Returns True if we're inside a Docker container, False otherwise.'''
     return os.path.isfile("/.dockerenv")
