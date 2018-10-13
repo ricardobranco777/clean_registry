@@ -11,7 +11,7 @@ NOTES:
   - This script may run stand-alone (on local setups) or dockerized (which supports remote Docker setups).
   - This script is Python 3 only.
 
-v1.3.1 by Ricardo Branco
+v1.3.2 by Ricardo Branco
 
 MIT License
 """
@@ -34,7 +34,7 @@ from docker.errors import APIError, NotFound, TLSParameterError
 
 import yaml
 
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
 args = None
 
@@ -177,7 +177,7 @@ class RegistryCleaner():
         except (APIError, exceptions.ConnectionError) as err:
             error(err)
 
-        if self.info['Config']['Image'] != "registry:2":
+        if not re.match("registry:2(@sha256:[0-9a-f]{64})?$", self.info['Config']['Image']):
             error("The container %s is not running the registry:2 image" % (container))
 
         if LooseVersion(self.get_image_version()) < LooseVersion("v2.4.0"):
