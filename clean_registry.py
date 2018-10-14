@@ -103,7 +103,7 @@ def clean_repo(image):
         return False
 
     if args.remove:
-        tags = os.listdir(repo + "/_manifests/tags/")
+        tags = set(os.listdir(repo + "/_manifests/tags/"))
         if not tag or len(tags) == 1 and tag in tags:
             remove(repo)
             return True
