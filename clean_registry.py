@@ -275,7 +275,7 @@ class RegistryCleaner():
 
         if not registry_dir:
             config_yml = self.info['Args'][0]
-            data = yaml.load(self.get_file(config_yml))
+            data = yaml.load(self.get_file(config_yml), Loader=yaml.FullLoader)
             try:
                 registry_dir = data['storage']['filesystem']['rootdirectory']
             except KeyError:
