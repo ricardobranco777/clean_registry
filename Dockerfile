@@ -6,6 +6,7 @@ RUN	apk --no-cache add \
 		gcc \
 		libc-dev \
 		libffi-dev \
+		make \
 		openssl-dev \
 		python3-dev \
 		python3 && \
@@ -15,6 +16,7 @@ RUN	apk --no-cache add \
 		gcc \
 		libc-dev \
 		libffi-dev \
+		make \
 		openssl-dev \
 		python3-dev
 
