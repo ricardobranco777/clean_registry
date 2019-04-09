@@ -11,13 +11,14 @@ NOTES:
   - This script may run stand-alone (on local setups) or dockerized (which supports remote Docker setups).
   - This script is Python 3 only.
 
-v1.4 by Ricardo Branco
+v1.5 by Ricardo Branco
 
 MIT License
 """
 
 import os
 import re
+import shlex
 import sys
 import tarfile
 import subprocess
@@ -30,11 +31,11 @@ from shutil import rmtree
 from requests import exceptions
 
 import docker
-from docker.errors import APIError, NotFound, TLSParameterError
+from docker.errors import DockerException, APIError, NotFound, TLSParameterError
 
 import yaml
 
-VERSION = "1.4"
+VERSION = "1.5"
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
 args = None
 
@@ -295,15 +296,18 @@ class RegistryCleaner():
 
     def get_image_version(self):
         '''Gets the Docker distribution version running on the container'''
-        if self.info['State']['Running']:
-            data = self.docker.containers.get(
-                self.containers[0]
-            ).exec_run("/bin/registry --version").output
-        else:
-            data = self.docker.containers.run(
-                self.info['Config']['Image'], command="--version", remove=True
-            )
-        return data.decode('utf-8').split()[2]
+        try:
+            if self.info['State']['Running']:
+                data = self.docker.containers.get(
+                    self.containers[0]
+                ).exec_run("/bin/registry --version").output
+            else:
+                data = self.docker.containers.run(
+                    self.info['Config']['Image'], command="--version", remove=True
+                )
+            return data.decode('utf-8').split()[2]
+        except DockerException as err:
+            error(err)
 
     def garbage_collect(self):
         '''Runs garbage-collect'''
@@ -311,13 +315,15 @@ class RegistryCleaner():
         if dockerized():
             command = "/bin/registry " + command
             with subprocess.Popen(
-                    command.split(),
+                    shlex.split(command),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT
             ) as proc:
+                # It seems we have to consume stdout so we have a return code
+                out = proc.stdout.read()
                 if not args.quiet:
-                    print(proc.stdout.read().decode('utf-8'))
-            status = proc.wait()
+                    print(out.decode('utf-8'))
+            status = bool(proc.returncode == 0)
         else:
             cli = self.docker.containers.run(
                 "registry:2",
