@@ -5,13 +5,13 @@ It works on the whole registry or the specified repositories.
 The optional -x flag may be used to completely remove the specified repositories or tagged images.
 
 NOTES:
-  - This script pauses the Registry container during cleanup to prevent corruption,
+  - This script stops the Registry container during cleanup to prevent corruption,
     making it temporarily unavailable to clients.
   - This script assumes local storage (the filesystem storage driver).
   - This script may run stand-alone (on local setups) or dockerized (which supports remote Docker setups).
   - This script is Python 3 only.
 
-v1.5 by Ricardo Branco
+v1.6 by Ricardo Branco
 
 MIT License
 """
@@ -35,7 +35,7 @@ from docker.errors import DockerException, APIError, NotFound, TLSParameterError
 
 import yaml
 
-VERSION = "1.5"
+VERSION = "1.6"
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
 args = None
 
@@ -152,14 +152,14 @@ def check_name(image):
 
 class RegistryCleaner():
     '''Simple callable class for Docker Registry cleaning duties'''
-    def __init__(self, container_or_service=None, volume=None):
+    def __init__(self, container=None, volume=None):
         try:
             self.docker = docker.from_env()
         except TLSParameterError as err:
             error(err)
 
-        if volume:
-            self.containers = None
+        if container is None:
+            self.container = None
             try:
                 self.volume = self.docker.volumes.get(volume)
                 self.registry_dir = self.volume.attrs['Mountpoint']
@@ -172,10 +172,14 @@ class RegistryCleaner():
                     self.registry_dir = "/var/lib/registry"
             return
 
-        self._get_info(container_or_service)
+        try:
+            self.info = self.docker.api.inspect_container(container)
+            self.container = self.info['Id']
+        except (APIError, exceptions.ConnectionError) as err:
+            error(err)
 
         if not re.match("registry:2(@sha256:[0-9a-f]{64})?$", self.info['Config']['Image']):
-            error("%s is not running the registry:2 image" % (container_or_service))
+            error("The container %s is not running the registry:2 image" % container)
 
         if LooseVersion(self.get_image_version()) < LooseVersion("v2.4.0"):
             error("You're not running Docker Registry 2.4.0+")
@@ -191,11 +195,8 @@ class RegistryCleaner():
         except FileNotFoundError as err:
             error(err)
 
-        # We could use stop() but the orchestrator would start another container
-        if self.containers is not None:
-            for container in self.containers:
-                if self.info['State']['Running']:
-                    self.docker.api.pause(container)
+        if self.container is not None:
+            self.docker.api.stop(self.container)
 
         images = args.images or \
             map(os.path.dirname, iglob("**/_manifests", recursive=True))
@@ -208,52 +209,17 @@ class RegistryCleaner():
         if not self.garbage_collect():
             exit_status = 1
 
-        if self.containers is not None:
-            for container in self.containers:
-                if self.info['State']['Running']:
-                    self.docker.api.unpause(container)
+        if self.container is not None:
+            self.docker.api.start(self.container)
 
         self.docker.close()
         return exit_status
-
-    def _get_info(self, container_or_service):
-        self.containers = []
-
-        # Is a service?
-        try:
-            service = self.docker.services.get(container_or_service)
-        except NotFound:
-            pass
-        except (APIError, exceptions.ConnectionError) as err:
-            error(err)
-        else:
-            # Get list of containers to pause them all
-            try:
-                tasks = service.tasks(filters={'desired-state': "running"})
-            except (APIError, NotFound, exceptions.ConnectionError) as err:
-                error(err)
-            self.containers = [
-                item['Status']['ContainerStatus']['ContainerID']
-                for _, item in enumerate(tasks)
-            ]
-
-        # Get information from the first container in list.
-        # We can't get the source of /var/lib/registry from inspect_service()
-        #   if a bind mount was not specified.
-        try:
-            self.info = self.docker.api.inspect_container(
-                self.containers[0] if self.containers else container_or_service
-            )
-        except (APIError, NotFound, exceptions.ConnectionError) as err:
-            error(err)
-        if not self.containers:
-            self.containers = [self.info['Id']]
 
     def get_file(self, path):
         '''Returns the contents of the specified file from the container'''
         try:
             with BytesIO(b"".join(
-                    _ for _ in self.docker.api.get_archive(self.containers[0], path)[0]
+                    _ for _ in self.docker.api.get_archive(self.container, path)[0]
             )) as buf, tarfile.open(fileobj=buf) \
                     as tar, tar.extractfile(os.path.basename(path)) \
                     as infile:
@@ -299,7 +265,7 @@ class RegistryCleaner():
         try:
             if self.info['State']['Running']:
                 data = self.docker.containers.get(
-                    self.containers[0]
+                    self.container
                 ).exec_run("/bin/registry --version").output
             else:
                 data = self.docker.containers.run(
@@ -348,7 +314,7 @@ class RegistryCleaner():
 def main():
     '''Main function'''
     progname = os.path.basename(sys.argv[0])
-    usage = "\rUsage: " + progname + " [OPTIONS] SERVICE|CONTAINER|VOLUME [REPOSITORY[:TAG]]..." + """
+    usage = "\rUsage: " + progname + " [OPTIONS] VOLUME|CONTAINER [REPOSITORY[:TAG]]..." + """
 Options:
         -x, --remove    Remove the specified images or repositories.
         -v, --volume    Specify a volume instead of container.
@@ -361,7 +327,7 @@ Options:
     parser.add_argument('-x', '--remove', action='store_true')
     parser.add_argument('-v', '--volume', action='store_true')
     parser.add_argument('-V', '--version', action='store_true')
-    parser.add_argument('foobar', nargs='?')
+    parser.add_argument('container_or_volume', nargs='?')
     parser.add_argument('images', nargs='*')
     global args
     args = parser.parse_args()
@@ -372,7 +338,7 @@ Options:
     elif args.version:
         print(progname + " " + VERSION)
         sys.exit(0)
-    elif not args.foobar:
+    elif not args.container_or_volume:
         print('usage: ' + usage)
         sys.exit(1)
 
@@ -384,9 +350,9 @@ Options:
         error("The -x option requires that you specify at least one repository...")
 
     if args.volume:
-        cleaner = RegistryCleaner(volume=args.foobar)
+        cleaner = RegistryCleaner(volume=args.container_or_volume)
     else:
-        cleaner = RegistryCleaner(container_or_service=args.foobar)
+        cleaner = RegistryCleaner(container=args.container_or_volume)
 
     sys.exit(cleaner())
 

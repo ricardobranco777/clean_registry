@@ -27,10 +27,11 @@ You may need to execute above commands as privileged user to access docker servi
 ## Usage
 
 ```
-clean_registry.py [OPTIONS] CONTAINER [REPOSITORY[:TAG]]...
+Usage: clean_registry.py [OPTIONS] VOLUME|CONTAINER [REPOSITORY[:TAG]]...
 Options:
         -x, --remove    Remove the specified images or repositories.
-        -q, --quiet     Suppress non-error messages.
+        -q, --quiet     Supress non-error messages.
+        -v, --volume    Specify a volume instead of container.
         -V, --version   Show version and exit.
 ```
 
