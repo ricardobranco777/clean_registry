@@ -144,10 +144,8 @@ def check_name(image):
 
     return len(image) < 256 and len(tag) < 129 and \
         re.match('[a-zA-Z0-9_][a-zA-Z0-9_.-]*$', tag) and \
-        all(
-            re.match('[a-z0-9]+(?:(?:[._]|__|[-]*)[a-z0-9]+)*$', path)
-            for path in repo.split("/")
-        )
+        all(re.match('[a-z0-9]+(?:(?:[._]|__|[-]*)[a-z0-9]+)*$', path)
+            for path in repo.split("/"))
 
 
 class RegistryCleaner():

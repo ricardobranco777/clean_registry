@@ -3,6 +3,8 @@ Clean the Docker Registry by removing untagged repositories and running the garb
 
 The optional ``-x`` flag may be used to remove the specified repositories or tagged images.
 
+[![Build Status](https://travis-ci.org/ricardobranco777/clean_registry.svg?branch=master)](https://travis-ci.org/ricardobranco777/clean_registry)
+
 # WARNING:
 
 Make backups of target docker-registry to avoid losing data.
