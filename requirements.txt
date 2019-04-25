@@ -1,6 +1,4 @@
 asn1crypto==0.24.0
-backports.ssl-match-hostname==3.5.0.1
-backports.weakref==1.0.post1
 bcrypt==3.1.6
 certifi==2019.3.9
 cffi==1.12.2

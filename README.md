@@ -15,7 +15,7 @@ This script assumes the [filesystem](https://github.com/docker/distribution/blob
 
 ## Running standalone
 
-This script may be run as stand-alone (on local setups) or dockerized (which supports both local and remote Docker setups). To run stand-alone, the best is to run in virtualenv and install required packages via pip:
+This script may be run as stand-alone with Python 3.5+ (local Docker setups) or dockerized (which supports both local and remote Docker setups). To run stand-alone, the best is to run in virtualenv and install required packages via pip:
 
 ```bash
 virtualenv --python=python3 .venv
