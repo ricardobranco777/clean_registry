@@ -11,7 +11,7 @@ NOTES:
   - This script may run stand-alone (on local setups) or dockerized (which supports remote Docker setups).
   - This script is Python 3 only.
 
-v1.6 by Ricardo Branco
+v1.6.1 by Ricardo Branco
 
 MIT License
 """
@@ -35,7 +35,7 @@ from docker.errors import DockerException, APIError, NotFound, TLSParameterError
 
 import yaml
 
-VERSION = "1.6"
+VERSION = "1.6.1"
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
 args = None
 
