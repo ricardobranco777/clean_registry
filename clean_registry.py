@@ -176,7 +176,7 @@ class RegistryCleaner():
         except (APIError, exceptions.ConnectionError) as err:
             error(err)
 
-        if not re.match("registry:2(@sha256:[0-9a-f]{64})?$", self.info['Config']['Image']):
+        if not self.info['Config']['Image'].startswith("registry:2"):
             error("The container %s is not running the registry:2 image" % container)
 
         if LooseVersion(self.get_image_version()) < LooseVersion("v2.4.0"):
