@@ -28,10 +28,10 @@ from distutils.version import LooseVersion
 from glob import iglob
 from io import BytesIO
 from shutil import rmtree
-from requests import exceptions
+from requests.exceptions import RequestException
 
 import docker
-from docker.errors import DockerException, APIError, NotFound, TLSParameterError
+from docker.errors import DockerException
 
 import yaml
 
@@ -153,7 +153,7 @@ class RegistryCleaner():
     def __init__(self, container=None, volume=None):
         try:
             self.docker = docker.from_env()
-        except TLSParameterError as err:
+        except (RequestException, DockerException) as err:
             error(err)
 
         if container is None:
@@ -161,7 +161,7 @@ class RegistryCleaner():
             try:
                 self.volume = self.docker.volumes.get(volume)
                 self.registry_dir = self.volume.attrs['Mountpoint']
-            except (APIError, exceptions.ConnectionError) as err:
+            except (RequestException, DockerException) as err:
                 error(err)
             if dockerized():
                 try:
@@ -173,7 +173,7 @@ class RegistryCleaner():
         try:
             self.info = self.docker.api.inspect_container(container)
             self.container = self.info['Id']
-        except (APIError, exceptions.ConnectionError) as err:
+        except (RequestException, DockerException) as err:
             error(err)
 
         if not self.info['Config']['Image'].startswith("registry:2"):
@@ -190,7 +190,7 @@ class RegistryCleaner():
     def __call__(self):
         try:
             os.chdir(self.registry_dir + "/docker/registry/v2/repositories")
-        except FileNotFoundError as err:
+        except OSError as err:
             error(err)
 
         if self.container is not None:
@@ -222,7 +222,7 @@ class RegistryCleaner():
                     as tar, tar.extractfile(os.path.basename(path)) \
                     as infile:
                 data = infile.read()
-        except NotFound as err:
+        except (RequestException, DockerException) as err:
             error(err)
         return data
 
@@ -270,7 +270,7 @@ class RegistryCleaner():
                     self.info['Config']['Image'], command="--version", remove=True
                 )
             return data.decode('utf-8').split()[2]
-        except DockerException as err:
+        except (RequestException, DockerException) as err:
             error(err)
 
     def garbage_collect(self):
