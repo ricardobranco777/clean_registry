@@ -208,7 +208,10 @@ class RegistryCleaner():
             exit_status = 1
 
         if self.container is not None:
-            self.docker.api.start(self.container)
+            try:
+                self.docker.api.start(self.container)
+            except (RequestException, DockerException):
+                pass  # Ignore error if we try to start a stopped container
 
         self.docker.close()
         return exit_status
