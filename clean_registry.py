@@ -48,49 +48,38 @@ def dockerized():
     return os.path.isfile("/.dockerenv")
 
 
-def error(msg, bye=True):
-    '''Prints an error message and optionally exit with a status code of 1'''
-    print("ERROR: " + str(msg), file=sys.stderr)
-    if bye:
-        sys.exit(1)
-
-
 def remove(path):
     '''Run rmtree() in verbose mode'''
     rmtree(path)
     if not args.quiet:
-        print("removed directory " + path)
+        print(f"removed directory {path}")
 
 
 def clean_revisions(repo):
     '''Remove the revision manifests that are not present in the tags directory'''
-    revisions = set(
-        os.listdir(repo + "/_manifests/revisions/sha256/")
-    )
-    manifests = set(
-        map(os.path.basename, iglob(repo + "/_manifests/tags/*/*/sha256/*"))
-    )
+    revisions = set(os.listdir(f"{repo}/_manifests/revisions/sha256/"))
+    manifests = set(map(os.path.basename, iglob(f"{repo}/_manifests/tags/*/*/sha256/*")))
     revisions.difference_update(manifests)
     for revision in revisions:
-        remove(repo + "/_manifests/revisions/sha256/" + revision)
+        remove(f"{repo}/_manifests/revisions/sha256/{revision}")
 
 
 def clean_tag(repo, tag):
     '''Clean a specific repo:tag'''
-    link = repo + "/_manifests/tags/" + tag + "/current/link"
+    link = f"{repo}/_manifests/tags/{tag}/current/link"
     if not os.path.isfile(link):
-        error("No such tag: %s in repository %s" % (tag, repo), bye=False)
+        print(f"ERROR: No such tag: {tag} in repository {repo}", file=sys.stderr)
         return False
     if args.remove:
-        remove(repo + "/_manifests/tags/" + tag)
+        remove(f"{repo}/_manifests/tags/{tag}")
     else:
         with open(link) as infile:
             current = infile.read()[len("sha256:"):]
-        path = repo + "/_manifests/tags/" + tag + "/index/sha256/"
+        path = f"{repo}/_manifests/tags/{tag}/index/sha256/"
         for index in os.listdir(path):
             if index == current:
                 continue
-            remove(path + index)
+            remove(f"{path}{index}")
     clean_revisions(repo)
     return True
 
@@ -100,11 +89,11 @@ def clean_repo(image):
     repo, tag = image.split(":", 1) if ":" in image else (image, "")
 
     if not os.path.isdir(repo):
-        error("No such repository: " + repo, bye=False)
+        print(f"ERROR: No such repository: {repo}", file=sys.stderr)
         return False
 
     if args.remove:
-        tags = set(os.listdir(repo + "/_manifests/tags/"))
+        tags = set(os.listdir(f"{repo}/_manifests/tags/"))
         if not tag or len(tags) == 1 and tag in tags:
             remove(repo)
             return True
@@ -113,10 +102,10 @@ def clean_repo(image):
         return clean_tag(repo, tag)
 
     currents = set()
-    for link in iglob(repo + "/_manifests/tags/*/current/link"):
+    for link in iglob(f"{repo}/_manifests/tags/*/current/link"):
         with open(link) as infile:
             currents.add(infile.read()[len("sha256:"):])
-    for index in iglob(repo + "/_manifests/tags/*/index/sha256/*"):
+    for index in iglob(f"{repo}/_manifests/tags/*/index/sha256/*"):
         if os.path.basename(index) not in currents:
             remove(index)
 
@@ -154,7 +143,7 @@ class RegistryCleaner():
         try:
             self.docker = docker.from_env()
         except (RequestException, DockerException) as err:
-            error(err)
+            sys.exit(f"ERROR: {str(err)}")
 
         if container is None:
             self.container = None
@@ -162,7 +151,7 @@ class RegistryCleaner():
                 self.volume = self.docker.volumes.get(volume)
                 self.registry_dir = self.volume.attrs['Mountpoint']
             except (RequestException, DockerException) as err:
-                error(err)
+                sys.exit(f"ERROR: {str(err)}")
             if dockerized():
                 try:
                     self.registry_dir = os.environ[REGISTRY_DIR]
@@ -174,13 +163,13 @@ class RegistryCleaner():
             self.info = self.docker.api.inspect_container(container)
             self.container = self.info['Id']
         except (RequestException, DockerException) as err:
-            error(err)
+            sys.exit(f"ERROR: {str(err)}")
 
         if not self.info['Config']['Image'].startswith("registry:2"):
-            error("The container %s is not running the registry:2 image" % container)
+            sys.exit(f"ERROR: The container {container} is not running the registry:2 image")
 
         if LooseVersion(self.get_image_version()) < LooseVersion("v2.4.0"):
-            error("You're not running Docker Registry 2.4.0+")
+            sys.exit("ERROR: You're not running Docker Registry 2.4.0+")
 
         self.registry_dir = self.get_registry_dir()
 
@@ -189,9 +178,9 @@ class RegistryCleaner():
 
     def __call__(self):
         try:
-            os.chdir(self.registry_dir + "/docker/registry/v2/repositories")
+            os.chdir(f"{self.registry_dir}/docker/registry/v2/repositories")
         except OSError as err:
-            error(err)
+            sys.exit(f"ERROR: {str(err)}")
 
         if self.container is not None:
             self.docker.api.stop(self.container)
@@ -226,7 +215,7 @@ class RegistryCleaner():
                     as infile:
                 data = infile.read()
         except (RequestException, DockerException) as err:
-            error(err)
+            sys.exit(f"ERROR: {str(err)}")
         return data
 
     def get_registry_dir(self):
@@ -251,7 +240,7 @@ class RegistryCleaner():
                     _ for _ in 'azure gcs inmemory oss s3 swift'.split()
                     if _ in data['storage']
                 ][0]
-                error("Unsupported storage driver: " + driver)
+                sys.exit(f"ERROR: Unsupported storage driver: {driver}")
 
         if dockerized():
             return registry_dir
@@ -274,13 +263,13 @@ class RegistryCleaner():
                 )
             return data.decode('utf-8').split()[2]
         except (RequestException, DockerException) as err:
-            error(err)
+            sys.exit(f"ERROR: {str(err)}")
 
     def garbage_collect(self):
         '''Runs garbage-collect'''
-        command = "garbage-collect " + "/etc/docker/registry/config.yml"
+        command = "garbage-collect /etc/docker/registry/config.yml"
         if dockerized():
-            command = "/bin/registry " + command
+            command = f"/bin/registry {command}"
             with subprocess.Popen(
                     shlex.split(command),
                     stdout=subprocess.PIPE,
@@ -315,7 +304,7 @@ class RegistryCleaner():
 def main():
     '''Main function'''
     progname = os.path.basename(sys.argv[0])
-    usage = "\rUsage: " + progname + " [OPTIONS] VOLUME|CONTAINER [REPOSITORY[:TAG]]..." + """
+    usage = f"\rUsage: {progname} [OPTIONS] VOLUME|CONTAINER [REPOSITORY[:TAG]]..." + """
 Options:
         -x, --remove    Remove the specified images or repositories.
         -v, --volume    Specify a volume instead of container.
@@ -334,21 +323,21 @@ Options:
     args = parser.parse_args()
 
     if args.help:
-        print('usage: ' + usage)
+        print(f'usage: {usage}')
         sys.exit(0)
     elif args.version:
-        print(progname + " " + VERSION)
+        print(f'{progname} {VERSION}')
         sys.exit(0)
     elif not args.container_or_volume:
-        print('usage: ' + usage)
+        print(f'usage: {usage}')
         sys.exit(1)
 
     for image in args.images:
         if not check_name(image):
-            error("Invalid Docker repository/tag: " + image)
+            sys.exit(f"ERROR: Invalid Docker repository/tag: {image}")
 
     if args.remove and not args.images:
-        error("The -x option requires that you specify at least one repository...")
+        sys.exit("ERROR: The -x option requires that you specify at least one repository...")
 
     if args.volume:
         cleaner = RegistryCleaner(volume=args.container_or_volume)
