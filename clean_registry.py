@@ -35,7 +35,7 @@ from docker.errors import DockerException
 
 import yaml
 
-VERSION = "1.6.1"
+VERSION = "1.6.2"
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
 
 USAGE = f"""{sys.argv[0]} [OPTIONS] VOLUME|CONTAINER [REPOSITORY[:TAG]]...
