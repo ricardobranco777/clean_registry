@@ -4,9 +4,9 @@ COPY	requirements.txt /tmp
 
 RUN	apk --no-cache add --virtual .build-deps \
 		gcc \
-		libc-dev \
 		libffi-dev \
 		make \
+		musl-dev \
 		openssl-dev \
 		python3-dev && \
 	apk --no-cache add python3 && \
