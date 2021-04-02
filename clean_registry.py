@@ -37,10 +37,13 @@ import yaml
 
 VERSION = "1.6.1"
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
-args = None
 
-
-os.environ['LC_ALL'] = 'C.UTF-8'
+USAGE = f"""{sys.argv[0]} [OPTIONS] VOLUME|CONTAINER [REPOSITORY[:TAG]]...
+Options:
+        -x, --remove    Remove the specified images or repositories.
+        -v, --volume    Specify a volume instead of container.
+        -q, --quiet     Supress non-error messages.
+        -V, --version   Show version and exit."""
 
 
 def dockerized():
@@ -301,17 +304,9 @@ class RegistryCleaner():
         return status
 
 
-def main():
-    '''Main function'''
-    progname = os.path.basename(sys.argv[0])
-    usage = f"\rUsage: {progname} [OPTIONS] VOLUME|CONTAINER [REPOSITORY[:TAG]]..." + """
-Options:
-        -x, --remove    Remove the specified images or repositories.
-        -v, --volume    Specify a volume instead of container.
-        -q, --quiet     Supress non-error messages.
-        -V, --version   Show version and exit."""
-
-    parser = ArgumentParser(usage=usage, add_help=False)
+def parse_args():
+    """Parse args"""
+    parser = ArgumentParser(usage=USAGE, add_help=False)
     parser.add_argument('-h', '--help', action='store_true')
     parser.add_argument('-q', '--quiet', action='store_true')
     parser.add_argument('-x', '--remove', action='store_true')
@@ -319,19 +314,11 @@ Options:
     parser.add_argument('-V', '--version', action='store_true')
     parser.add_argument('container_or_volume', nargs='?')
     parser.add_argument('images', nargs='*')
-    global args
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    if args.help:
-        print(f'usage: {usage}')
-        sys.exit(0)
-    elif args.version:
-        print(f'{progname} {VERSION}')
-        sys.exit(0)
-    elif not args.container_or_volume:
-        print(f'usage: {usage}')
-        sys.exit(1)
 
+def main():
+    '''Main function'''
     for image in args.images:
         if not check_name(image):
             sys.exit(f"ERROR: Invalid Docker repository/tag: {image}")
@@ -348,6 +335,16 @@ Options:
 
 
 if __name__ == "__main__":
+    args = parse_args()
+    if args.help:
+        print(f'usage: {USAGE}')
+        sys.exit(0)
+    elif args.version:
+        print(f'{sys.argv[0]} {VERSION}')
+        sys.exit(0)
+    elif not args.container_or_volume:
+        print(f'usage: {USAGE}')
+        sys.exit(1)
     try:
         main()
     except KeyboardInterrupt:

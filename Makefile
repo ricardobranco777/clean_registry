@@ -1,6 +1,6 @@
 test:
-	@flake8 --ignore=E501,W504
-	@pylint --errors-only $$(find * -name \*.py)
+	@pylint *.py --disable=line-too-long
+	@flake8 --ignore=E501
 
 upload-pypi:
 	@python3 setup.py sdist bdist_wheel
