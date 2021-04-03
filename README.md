@@ -1,4 +1,5 @@
 # clean_registry
+
 Clean the Docker Registry by removing untagged repositories and running the garbage collector in Docker Registry >= 2.4.0
 
 The optional ``-x`` flag may be used to remove the specified repositories or tagged images.
@@ -7,6 +8,8 @@ The optional ``-x`` flag may be used to remove the specified repositories or tag
 
 NOTE:
 With Docker Registry >= 2.7.0 you can run the garbage collector with the `-m` (`--delete-untagged`) option to remove untagged repositories but it doesn't work with multi-arch images as noted in this [bug](https://github.com/distribution/distribution/issues/3178).  The only workaround is to avoid multi-arch images and add the archictecture name to the tag.
+
+This project is deprecated by [regview](https://github.com/ricardobranco777/regview/) which uses the Docker Registry API to delete manifests.
 
 ## NOTES:
 
