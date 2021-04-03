@@ -5,13 +5,16 @@ The optional ``-x`` flag may be used to remove the specified repositories or tag
 
 [![Build Status](https://travis-ci.org/ricardobranco777/clean_registry.svg?branch=master)](https://travis-ci.org/ricardobranco777/clean_registry)
 
-# WARNING:
+NOTE:
+With Docker Registry >= 2.7.0 you can run the garbage collector with the `-m` (`--delete-untagged`) option to remove untagged repositories but it doesn't work with multi-arch images as noted in this [bug](https://github.com/distribution/distribution/issues/3178).  The only workaround is to avoid multi-arch images and add the archictecture name to the tag.
 
-Make backups of target docker-registry to avoid losing data.
+## NOTES:
 
-This script stops the Registry container during cleanup to prevent corruption, making it temporarily unavailable to clients.
+- Make backups to avoid losing data.
 
-This script assumes the [filesystem](https://github.com/docker/distribution/blob/master/docs/configuration.md#storage) storage driver.
+- This script stops the Registry container during cleanup to prevent corruption, making it temporarily unavailable to clients.
+
+- This script assumes the [filesystem](https://github.com/docker/distribution/blob/master/docs/configuration.md#storage) storage driver.
 
 ## Running standalone
 
