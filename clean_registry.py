@@ -76,7 +76,7 @@ def clean_tag(repo, tag):
     if args.remove:
         remove(f"{repo}/_manifests/tags/{tag}")
     else:
-        with open(link) as infile:
+        with open(link, encoding="utf-8") as infile:
             current = infile.read()[len("sha256:"):]
         path = f"{repo}/_manifests/tags/{tag}/index/sha256/"
         for index in os.listdir(path):
@@ -106,7 +106,7 @@ def clean_repo(image):
 
     currents = set()
     for link in iglob(f"{repo}/_manifests/tags/*/current/link"):
-        with open(link) as infile:
+        with open(link, encoding="utf-8") as infile:
             currents.add(infile.read()[len("sha256:"):])
     for index in iglob(f"{repo}/_manifests/tags/*/index/sha256/*"):
         if os.path.basename(index) not in currents:
