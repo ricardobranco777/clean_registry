@@ -8,7 +8,6 @@ RUN	apk --no-cache add --virtual .build-deps \
 		libffi-dev \
 		make \
 		musl-dev \
-		openssl-dev \
 		py3-pip \
 		python3-dev \
 		rust && \
