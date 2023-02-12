@@ -1,5 +1,5 @@
 bcrypt==3.2.2
-certifi==2022.5.18.1
+certifi==2022.12.07
 cffi==1.15.0
 charset-normalizer==2.0.12
 cryptography==39.0.1
