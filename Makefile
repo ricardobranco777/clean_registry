@@ -1,5 +1,5 @@
 test:
-	@pylint *.py --disable=line-too-long
+	@pylint *.py --disable=line-too-long,deprecated-module
 	@flake8 --ignore=E501
 
 upload-pypi:
