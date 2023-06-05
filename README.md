@@ -2,6 +2,8 @@
 
 Clean the Docker Registry by removing untagged repositories and running the garbage collector in Docker Registry >= 2.4.0
 
+Docker image available at `ghcr.io/ricardobranco777/clean_registry:latest`
+
 The optional ``-x`` flag may be used to remove the specified repositories or tagged images.
 
 [![Build Status](https://travis-ci.com/ricardobranco777/clean_registry.svg?branch=master)](https://travis-ci.org/ricardobranco777/clean_registry)
