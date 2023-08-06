@@ -13,17 +13,14 @@ With Docker Registry >= 2.7.0 you can run the garbage collector with the `-m` (`
 
 ## NOTES:
 
-- Make backups to avoid losing data.
+- Make backups to avoid losing data!!!
 
-- This script stops the Registry container during cleanup to prevent corruption, making it temporarily unavailable to clients.
+- You must stop the Registry container before cleanup and start it afterwards.
 
 - This script assumes the [filesystem](https://github.com/docker/distribution/blob/master/docs/configuration.md#storage) storage driver.
 
 ## Requirements
 
-- Tested on Python 3.8+
-- [docker-py](https://github.com/docker/docker-py/)
-- [podman-py](https://github.com/containers/podman-py)
 - Podman or Docker to run the image
 
 ## Usage

@@ -11,7 +11,6 @@ import tarfile
 import subprocess
 
 from argparse import ArgumentParser
-from enum import Enum
 from glob import iglob
 from io import BytesIO
 from shutil import rmtree
@@ -136,19 +135,15 @@ def check_name(image: str) -> bool:
     return len(image) < 256 and tag_valid and repo_valid
 
 
-Backend = Enum('Backend', ['Docker', 'Podman'])
-
-
-class ContainerClient:
-    '''Class to abstract differences between docker-py & podman-py'''
-    def __init__(self, backend=Backend.Docker):
-        self.backend = backend
-        if backend is Backend.Docker:
+class RegistryCleaner():
+    '''Simple callable class for Docker Registry cleaning duties'''
+    def __init__(self, container: str, use_docker=False):
+        if use_docker:
             try:
                 self.client = docker.from_env()
             except (RequestException, DockerException) as err:
                 sys.exit(f"ERROR: {str(err)}")
-        elif backend is Backend.Podman:
+        else:
             base_url = os.environ['DOCKER_HOST'] = os.getenv('DOCKER_HOST', 'unix:///run/podman/podman.sock')
             try:
                 self.client = PodmanClient(base_url=base_url)
@@ -156,56 +151,21 @@ class ContainerClient:
                 sys.exit(f"Broken Podman environment: {exc}", file=sys.stderr)
             if not self.client.info()['host']['remoteSocket']["exists"]:
                 sys.exit("Please run systemctl --user enable --now podman.socket", file=sys.stderr)
-        else:
-            raise ValueError("Unsupported backend. Use 'docker' or 'podman'")
-
-        self.containers = self.client.containers
-        self.close = self.client.close
-
-    def get_archive(self, container_name: str, path: str):
-        '''Get archive'''
-        if self.backend is Backend.Docker:
-            return self.client.api.get_archive(container_name, path)[0]
-        container = self.client.containers.get(container_name)
-        return container.get_archive(path)
-
-    def inspect_container(self, container_name: str) -> dict:
-        '''Inspect container'''
-        if self.backend is Backend.Docker:
-            return self.client.api.inspect_container(container_name)
-        return self.client.containers.get(container_name).inspect()
-
-    def start_container(self, container_name: str):
-        '''Start container'''
-        if self.backend is Backend.Docker:
-            self.client.api.start(container_name)
-        container = self.client.containers.get(container_name)
-        container.start()
-
-    def stop_container(self, container_name: str):
-        '''Stop container'''
-        if self.backend is Backend.Docker:
-            self.client.api.stop(container_name)
-        container = self.client.containers.get(container_name)
-        container.stop()
-
-
-class RegistryCleaner():
-    '''Simple callable class for Docker Registry cleaning duties'''
-    def __init__(self, container: str, use_docker=False):
-        self.client = ContainerClient(
-            backend=Backend.Docker if use_docker else Backend.Podman
-        )
-        self.container = container
 
         try:
-            self.info = self.client.inspect_container(container)
-            self.container = self.info['Id']
+            self.container = self.client.containers.get(container)
+            if use_docker:
+                self.info = self.client.api.inspect_container(container)
+            else:
+                self.info = self.container.inspect()
         except (RequestException, DockerException, APIError, PodmanError) as err:
             sys.exit(f"ERROR: {str(err)}")
 
         if os.path.basename(self.info['Config']['Image']) != "registry:2":
             sys.exit(f"ERROR: The container {container} is not running the registry:2 image")
+
+        if self.info['State']['Running']:
+            sys.exit("ERROR: Please stop the container {container} before cleaning")
 
         _, distribution, version = self.get_image_version()
         if distribution != "github.com/docker/distribution" or Version(version) < Version("v2.4.0"):
@@ -220,8 +180,6 @@ class RegistryCleaner():
         except OSError as err:
             sys.exit(f"ERROR: {str(err)}")
 
-        self.client.stop_container(self.container)
-
         images = args.images or \
             map(os.path.dirname, iglob("**/_manifests", recursive=True))
 
@@ -233,11 +191,6 @@ class RegistryCleaner():
         if not self.garbage_collect():
             exit_status = 1
 
-        try:
-            self.client.start_container(self.container)
-        except (RequestException, DockerException, APIError, PodmanError):
-            pass  # Ignore error if we try to start a stopped container
-
         self.client.close()
         return exit_status
 
@@ -245,7 +198,7 @@ class RegistryCleaner():
         '''Returns the contents of the specified file from the container'''
         try:
             with BytesIO(b"".join(
-                    _ for _ in self.client.get_archive(self.container, path)[0]
+                    _ for _ in self.container.get_archive(path)[0]
             )) as buf, tarfile.open(fileobj=buf) \
                     as tar, tar.extractfile(os.path.basename(path)) \
                     as infile:
@@ -280,9 +233,7 @@ class RegistryCleaner():
         '''Gets the Docker distribution version running on the container'''
         try:
             if self.info['State']['Running']:
-                data = self.client.containers.get(
-                    self.container
-                ).exec_run("/bin/registry --version")
+                data = self.container.exec_run("/bin/registry --version")
                 if isinstance(data, tuple):  # podman
                     data = data[1]
                 else:

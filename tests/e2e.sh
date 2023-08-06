@@ -58,6 +58,8 @@ for runtime in docker podman ; do
 	"$runtime" "${runtime_options[@]}" push "${push_options[@]}" "$image:latest"
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 2 ]]
 
+	"$runtime" stop "$registry"
+
 	# Test cleanup
 	"$runtime" run --rm -e DOCKER_HOST --volumes-from "$registry" -v "$DOCKER_SOCKET:$DOCKER_SOCKET" -v "$PODMAN_SOCKET:/run/podman/podman.sock" "$image:test" --"$runtime" "$registry"
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 1 ]]
