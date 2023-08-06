@@ -2,9 +2,11 @@ FROM	registry:2
 
 COPY	requirements.txt /tmp/
 
-RUN	apk --no-cache add python3 py3-pip && \
+RUN	apk --no-cache add --virtual .build-deps libffi-dev && \
+	apk --no-cache add python3 py3-pip && \
 	pip install --no-cache-dir --upgrade pip && \
-	pip install --compile --no-cache-dir -r /tmp/requirements.txt
+	pip install --compile --no-cache-dir -r /tmp/requirements.txt && \
+	apk del .build-deps
 
 COPY	clean_registry.py /usr/local/bin/clean_registry.py
 
