@@ -29,10 +29,9 @@ import yaml
 VERSION = "1.7.0"
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"
 
-USAGE = f"""{sys.argv[0]} [OPTIONS] VOLUME|CONTAINER [REPOSITORY[:TAG]]...
+USAGE = f"""{sys.argv[0]} [OPTIONS] CONTAINER [REPOSITORY[:TAG]]...
 Options:
         -x, --remove    Remove the specified images or repositories.
-        -v, --volume    Specify a volume instead of container.
         -q, --quiet     Supress non-error messages.
         -V, --version   Show version and exit.
         --podman        Use podman client (default).
@@ -161,30 +160,29 @@ class ContainerClient:
             raise ValueError("Unsupported backend. Use 'docker' or 'podman'")
 
         self.containers = self.client.containers
-        self.volumes = self.client.volumes
         self.close = self.client.close
 
-    def get_archive(self, container_name, path):
+    def get_archive(self, container_name: str, path: str):
         '''Get archive'''
         if self.backend is Backend.Docker:
             return self.client.api.get_archive(container_name, path)[0]
         container = self.client.containers.get(container_name)
         return container.get_archive(path)
 
-    def inspect_container(self, container_name):
+    def inspect_container(self, container_name: str) -> dict:
         '''Inspect container'''
         if self.backend is Backend.Docker:
             return self.client.api.inspect_container(container_name)
         return self.client.containers.get(container_name).inspect()
 
-    def start_container(self, container_name):
+    def start_container(self, container_name: str):
         '''Start container'''
         if self.backend is Backend.Docker:
             self.client.api.start(container_name)
         container = self.client.containers.get(container_name)
         container.start()
 
-    def stop_container(self, container_name):
+    def stop_container(self, container_name: str):
         '''Stop container'''
         if self.backend is Backend.Docker:
             self.client.api.stop(container_name)
@@ -194,23 +192,11 @@ class ContainerClient:
 
 class RegistryCleaner():
     '''Simple callable class for Docker Registry cleaning duties'''
-    def __init__(self, container=None, volume=None, use_docker=False):
+    def __init__(self, container: str, use_docker=False):
         self.client = ContainerClient(
             backend=Backend.Docker if use_docker else Backend.Podman
         )
-
-        if container is None:
-            self.container = None
-            try:
-                self.volume = self.client.volumes.get(volume)
-                self.registry_dir = self.volume.attrs['Mountpoint']
-            except (RequestException, DockerException, APIError, PodmanError) as err:
-                sys.exit(f"ERROR: {str(err)}")
-            try:
-                self.registry_dir = os.environ[REGISTRY_DIR]
-            except KeyError:
-                self.registry_dir = "/var/lib/registry"
-            return
+        self.container = container
 
         try:
             self.info = self.client.inspect_container(container)
@@ -234,8 +220,7 @@ class RegistryCleaner():
         except OSError as err:
             sys.exit(f"ERROR: {str(err)}")
 
-        if self.container is not None:
-            self.client.stop_container(self.container)
+        self.client.stop_container(self.container)
 
         images = args.images or \
             map(os.path.dirname, iglob("**/_manifests", recursive=True))
@@ -248,11 +233,10 @@ class RegistryCleaner():
         if not self.garbage_collect():
             exit_status = 1
 
-        if self.container is not None:
-            try:
-                self.client.start_container(self.container)
-            except (RequestException, DockerException, APIError, PodmanError):
-                pass  # Ignore error if we try to start a stopped container
+        try:
+            self.client.start_container(self.container)
+        except (RequestException, DockerException, APIError, PodmanError):
+            pass  # Ignore error if we try to start a stopped container
 
         self.client.close()
         return exit_status
@@ -332,11 +316,10 @@ def parse_args():
     parser.add_argument('-h', '--help', action='store_true')
     parser.add_argument('-q', '--quiet', action='store_true')
     parser.add_argument('-x', '--remove', action='store_true')
-    parser.add_argument('-v', '--volume', action='store_true')
     parser.add_argument('-V', '--version', action='store_true')
     parser.add_argument('--podman', default=True, action='store_true')
     parser.add_argument('--docker', action='store_true')
-    parser.add_argument('container_or_volume', nargs='?')
+    parser.add_argument('container', nargs='?')
     parser.add_argument('images', nargs='*')
     return parser.parse_args()
 
@@ -353,11 +336,7 @@ def main():
     if args.remove and not args.images:
         sys.exit("ERROR: The -x option requires that you specify at least one repository...")
 
-    if args.volume:
-        cleaner = RegistryCleaner(volume=args.container_or_volume, use_docker=args.docker)
-    else:
-        cleaner = RegistryCleaner(container=args.container_or_volume, use_docker=args.docker)
-
+    cleaner = RegistryCleaner(container=args.container, use_docker=args.docker)
     sys.exit(cleaner())
 
 
@@ -371,7 +350,7 @@ if __name__ == "__main__":
     elif args.version:
         print(f'{sys.argv[0]} {VERSION}')
         sys.exit(0)
-    elif not args.container_or_volume:
+    elif not args.container:
         print(f'usage: {USAGE}')
         sys.exit(1)
     try:
