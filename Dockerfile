@@ -2,7 +2,7 @@ FROM	registry:2
 
 COPY	requirements.txt /tmp/
 
-RUN	apk --no-cache add --virtual .build-deps libffi-dev && \
+RUN	apk --no-cache add --virtual .build-deps gcc libffi-dev && \
 	apk --no-cache add python3 py3-pip && \
 	pip install --no-cache-dir --upgrade pip && \
 	pip install --compile --no-cache-dir -r /tmp/requirements.txt && \
