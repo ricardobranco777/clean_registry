@@ -10,3 +10,7 @@ flake8:
 .PHONY: pylint
 pylint:
 	@pylint --disable=line-too-long $(FILES)
+
+.PHONY: e2e
+e2e:
+	@bash tests/e2e.sh

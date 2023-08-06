@@ -1,4 +1,4 @@
-![Build Status](https://github.com/ricardobranco777/xwhich/actions/workflows/ci.yml/badge.svg)
+![Build Status](https://github.com/ricardobranco777/registry_clean/actions/workflows/ci.yml/badge.svg)
 
 # clean_registry
 
@@ -10,8 +10,6 @@ The optional ``-x`` flag may be used to remove the specified repositories or tag
 
 NOTE:
 With Docker Registry >= 2.7.0 you can run the garbage collector with the `-m` (`--delete-untagged`) option to remove untagged repositories but it doesn't work with multi-arch images as noted in this [bug](https://github.com/distribution/distribution/issues/3178).  The only workaround is to avoid multi-arch images and add the archictecture name to the tag.
-
-This project is deprecated by [regview](https://github.com/ricardobranco777/regview/) which uses the Docker Registry API to delete manifests.
 
 ## NOTES:
 
@@ -25,19 +23,8 @@ This project is deprecated by [regview](https://github.com/ricardobranco777/regv
 
 - Tested on Python 3.8+
 - [docker-py](https://github.com/docker/docker-py/)
-
-## Running standalone
-
-This script may be run as stand-alone with Python 3.6+ (local Docker setups) or dockerized (which supports both local and remote Docker setups). To run stand-alone, the best is to run in virtualenv and install required packages via pip:
-
-```bash
-virtualenv --python=python3 .venv
-. .venv/bin/activate
-pip3 install --upgrade pip
-pip3 install -r requirements.txt
-```
-
-You may need to execute above commands as privileged user to access docker service (sudo + activate virtualenv).
+- [podman-py](https://github.com/containers/podman-py)
+- Podman or Docker to run the image
 
 ## Usage
 
@@ -48,6 +35,8 @@ Options:
         -q, --quiet     Supress non-error messages.
         -v, --volume    Specify a volume instead of container.
         -V, --version   Show version and exit.
+        --podman        Use podman client (default).
+        --docker        Use docker client (default is podman).
 ```
 
 ## Docker usage with local Docker setup
@@ -68,7 +57,10 @@ Note:
 
 Paths other than ``/root/.docker`` path may be specified with the ``DOCKER_CERT_PATH`` environment variable.  In any case, your ``~/.docker/*.pem`` files should be in the server to be able to run as a client against itself.
 
+## Podman
+
+`alias docker=podman`
+
 ## TODO
 
-- Add unit tests and end-to-end tests
-- Add Podman support
+- Add unit tests
