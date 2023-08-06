@@ -1,19 +1,6 @@
 #!/usr/bin/env python3
 """
-This script purges untagged repositories and runs the garbage collector in Docker Registry >= 2.4.0.
-It works on the whole registry or the specified repositories.
-The optional -x flag may be used to completely remove the specified repositories or tagged images.
-
-NOTES:
-  - This script stops the Registry container during cleanup to prevent corruption,
-    making it temporarily unavailable to clients.
-  - This script assumes local storage (the filesystem storage driver).
-  - This script may run stand-alone (on local setups) or dockerized (which supports remote Docker setups).
-  - This script is Python 3 only.
-
-v1.6.1 by Ricardo Branco
-
-MIT License
+Docker Registry cleaner
 """
 
 import os
@@ -24,7 +11,7 @@ import tarfile
 import subprocess
 
 from argparse import ArgumentParser
-from distutils.version import LooseVersion
+from distutils.version import LooseVersion  # pylint: disable=deprecated-module
 from glob import iglob
 from io import BytesIO
 from shutil import rmtree
@@ -35,7 +22,7 @@ from docker.errors import DockerException
 
 import yaml
 
-VERSION = "1.6.2"
+VERSION = "1.6.3"
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTREGISTRY_DIR"
 
 USAGE = f"""{sys.argv[0]} [OPTIONS] VOLUME|CONTAINER [REPOSITORY[:TAG]]...

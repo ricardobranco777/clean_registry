@@ -1,10 +1,12 @@
-test:
-	@pylint *.py --disable=line-too-long,deprecated-module
-	@flake8 --ignore=E501
+FILES=*.py
 
-upload-pypi:
-	@python3 setup.py sdist bdist_wheel
-	@python3 -m twine upload dist/*
+.PHONY: all
+all: flake8 pylint
 
-clean:
-	@rm -rf dist/ build/ *.egg-info
+.PHONY: flake8
+flake8:
+	@flake8 --ignore=E501 $(FILES)
+
+.PHONY: pylint
+pylint:
+	@pylint --disable=line-too-long $(FILES)

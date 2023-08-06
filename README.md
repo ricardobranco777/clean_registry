@@ -1,3 +1,5 @@
+![Build Status](https://github.com/ricardobranco777/xwhich/actions/workflows/ci.yml/badge.svg)
+
 # clean_registry
 
 Clean the Docker Registry by removing untagged repositories and running the garbage collector in Docker Registry >= 2.4.0
@@ -5,8 +7,6 @@ Clean the Docker Registry by removing untagged repositories and running the garb
 Docker image available at `ghcr.io/ricardobranco777/clean_registry:latest`
 
 The optional ``-x`` flag may be used to remove the specified repositories or tagged images.
-
-[![Build Status](https://travis-ci.com/ricardobranco777/clean_registry.svg?branch=master)](https://travis-ci.org/ricardobranco777/clean_registry)
 
 NOTE:
 With Docker Registry >= 2.7.0 you can run the garbage collector with the `-m` (`--delete-untagged`) option to remove untagged repositories but it doesn't work with multi-arch images as noted in this [bug](https://github.com/distribution/distribution/issues/3178).  The only workaround is to avoid multi-arch images and add the archictecture name to the tag.
@@ -20,6 +20,11 @@ This project is deprecated by [regview](https://github.com/ricardobranco777/regv
 - This script stops the Registry container during cleanup to prevent corruption, making it temporarily unavailable to clients.
 
 - This script assumes the [filesystem](https://github.com/docker/distribution/blob/master/docs/configuration.md#storage) storage driver.
+
+## Requirements
+
+- Tested on Python 3.8+
+- [docker-py](https://github.com/docker/docker-py/)
 
 ## Running standalone
 
@@ -62,3 +67,8 @@ docker run --rm --volumes-from CONTAINER -e DOCKER_HOST -e DOCKER_TLS_VERIFY=1 -
 Note:
 
 Paths other than ``/root/.docker`` path may be specified with the ``DOCKER_CERT_PATH`` environment variable.  In any case, your ``~/.docker/*.pem`` files should be in the server to be able to run as a client against itself.
+
+## TODO
+
+- Add unit tests and end-to-end tests
+- Add Podman support
