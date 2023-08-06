@@ -206,11 +206,10 @@ class RegistryCleaner():
                 self.registry_dir = self.volume.attrs['Mountpoint']
             except (RequestException, DockerException, APIError, PodmanError) as err:
                 sys.exit(f"ERROR: {str(err)}")
-            if is_container():
-                try:
-                    self.registry_dir = os.environ[REGISTRY_DIR]
-                except KeyError:
-                    self.registry_dir = "/var/lib/registry"
+            try:
+                self.registry_dir = os.environ[REGISTRY_DIR]
+            except KeyError:
+                self.registry_dir = "/var/lib/registry"
             return
 
         try:
@@ -227,9 +226,7 @@ class RegistryCleaner():
             sys.exit("ERROR: You're not running Docker Registry 2.4.0+")
 
         self.registry_dir = self.get_registry_dir()
-
-        if is_container():
-            os.environ[REGISTRY_DIR] = self.registry_dir
+        os.environ[REGISTRY_DIR] = self.registry_dir
 
     def __call__(self):
         try:
@@ -293,13 +290,7 @@ class RegistryCleaner():
             except KeyError:
                 sys.exit("ERROR: Unsupported storage driver")
 
-        if is_container():
-            return registry_dir
-
-        for item in self.info['Mounts']:
-            if item['Destination'] == registry_dir:
-                return item['Source']
-        return None
+        return registry_dir
 
     def get_image_version(self) -> list[str]:
         '''Gets the Docker distribution version running on the container'''
@@ -322,40 +313,17 @@ class RegistryCleaner():
 
     def garbage_collect(self) -> bool:
         '''Runs garbage-collect'''
-        command = "garbage-collect /etc/docker/registry/config.yml"
-        if is_container():
-            command = f"/bin/registry {command}"
-            with subprocess.Popen(
-                    shlex.split(command),
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT
-            ) as proc:
-                # It seems we have to consume stdout so we have a return code
-                out = proc.stdout.read()
-                if not args.quiet:
-                    print(out.decode('utf-8'))
-            status = bool(proc.returncode == 0)
-        else:
-            cli = self.client.containers.run(
-                "registry:2",
-                command=command,
-                name=f"regclean{os.getpid()}",
-                detach=True,
-                stderr=True,
-                volumes={
-                    self.registry_dir: {
-                        'bind': "/var/lib/registry",
-                        'mode': "rw"
-                    }
-                }
-            )
+        command = "/bin/registry garbage-collect /etc/docker/registry/config.yml"
+        with subprocess.Popen(
+                shlex.split(command),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT
+        ) as proc:
+            # It seems we have to consume stdout so we have a return code
+            out = proc.stdout.read()
             if not args.quiet:
-                for line in cli.logs(stream=True):
-                    print(line.decode('utf-8'), end="")
-            status = bool(cli.wait()['StatusCode'] == 0)
-            cli.stop()
-            cli.remove()
-        return status
+                print(out.decode('utf-8'))
+        return bool(proc.returncode == 0)
 
 
 def parse_args():
@@ -375,6 +343,9 @@ def parse_args():
 
 def main():
     '''Main function'''
+    if not is_container():
+        sys.exit("ERROR: This script should run inside a container!")
+
     for image in args.images:
         if not check_name(image):
             sys.exit(f"ERROR: Invalid Docker repository/tag: {image}")
