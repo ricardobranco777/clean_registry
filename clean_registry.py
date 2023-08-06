@@ -25,7 +25,8 @@ from podman.errors import APIError, PodmanError
 
 import yaml
 
-VERSION = "1.7.0"
+VERSION = "2.0"
+
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"
 
 USAGE = f"""{sys.argv[0]} [OPTIONS] CONTAINER [REPOSITORY[:TAG]]...
