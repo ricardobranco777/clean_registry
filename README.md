@@ -1,4 +1,4 @@
-![Build Status](https://github.com/ricardobranco777/registry_clean/actions/workflows/ci.yml/badge.svg)
+![Build Status](https://github.com/ricardobranco777/clean_registry/actions/workflows/ci.yml/badge.svg)
 
 # clean_registry
 
