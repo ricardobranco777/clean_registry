@@ -153,9 +153,9 @@ class RegistryCleaner():
             try:
                 self.client = PodmanClient(base_url=base_url)
             except (APIError, PodmanError) as exc:
-                sys.exit(f"Broken Podman environment: {exc}", file=sys.stderr)
+                sys.exit(f"Broken Podman environment: {exc}")
             if not self.client.info()['host']['remoteSocket']["exists"]:
-                sys.exit("Please run systemctl --user enable --now podman.socket", file=sys.stderr)
+                sys.exit("Please run systemctl --user enable --now podman.socket")
 
         try:
             self.container = self.client.containers.get(container)
