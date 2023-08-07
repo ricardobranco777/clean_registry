@@ -31,6 +31,7 @@ Options:
         -x, --remove    Remove the specified images or repositories.
         -q, --quiet     Supress non-error messages.
         -V, --version   Show version and exit.
+        --dry-run       Don't remove anything.
         --podman        Use podman client (default).
         --docker        Use docker client (default is podman).
 ```

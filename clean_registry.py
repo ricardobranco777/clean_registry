@@ -34,6 +34,7 @@ Options:
         -x, --remove    Remove the specified images or repositories.
         -q, --quiet     Supress non-error messages.
         -V, --version   Show version and exit.
+        --dry-run       Don't remove anything.
         --podman        Use podman client (default).
         --docker        Use docker client (default is podman).
 """
@@ -44,30 +45,33 @@ def is_container() -> bool:
     return os.getenv("container") == "podman" or os.path.isfile("/.dockerenv")
 
 
-def remove_dir(path: str, quiet: bool = False) -> None:
+def remove_dir(path: str, quiet: bool = False, dry_run: bool = False) -> None:
     '''Run rmtree() in verbose mode'''
+    if dry_run:
+        print(f"directory {path} skipped due to dry-run")
+        return
     rmtree(path)
     if not quiet:
         print(f"removed directory {path}")
 
 
-def clean_revisions(repo: str, quiet: bool = False) -> None:
+def clean_revisions(repo: str, quiet: bool = False, dry_run: bool = False) -> None:
     '''Remove the revision manifests that are not present in the tags directory'''
     revisions = set(os.listdir(f"{repo}/_manifests/revisions/sha256/"))
     manifests = set(map(os.path.basename, iglob(f"{repo}/_manifests/tags/*/*/sha256/*")))
     revisions.difference_update(manifests)
     for revision in revisions:
-        remove_dir(f"{repo}/_manifests/revisions/sha256/{revision}", quiet)
+        remove_dir(f"{repo}/_manifests/revisions/sha256/{revision}", quiet, dry_run)
 
 
-def clean_tag(repo: str, tag: str, remove: bool = False, quiet: bool = False) -> bool:
+def clean_tag(repo: str, tag: str, remove: bool = False, quiet: bool = False, dry_run: bool = False) -> bool:
     '''Clean a specific repo:tag'''
     link = f"{repo}/_manifests/tags/{tag}/current/link"
     if not os.path.isfile(link):
         print(f"ERROR: No such tag: {tag} in repository {repo}", file=sys.stderr)
         return False
     if remove:
-        remove_dir(f"{repo}/_manifests/tags/{tag}", quiet)
+        remove_dir(f"{repo}/_manifests/tags/{tag}", quiet, dry_run)
     else:
         with open(link, encoding="utf-8") as infile:
             current = infile.read()[len("sha256:"):]
@@ -75,12 +79,12 @@ def clean_tag(repo: str, tag: str, remove: bool = False, quiet: bool = False) ->
         for index in os.listdir(path):
             if index == current:
                 continue
-            remove_dir(f"{path}{index}", quiet)
-    clean_revisions(repo, quiet)
+            remove_dir(f"{path}{index}", quiet, dry_run)
+    clean_revisions(repo, quiet, dry_run)
     return True
 
 
-def clean_repo(image: str, remove: bool = False, quiet: bool = False) -> bool:
+def clean_repo(image: str, remove: bool = False, quiet: bool = False, dry_run: bool = False) -> bool:
     '''Clean all tags (or a specific one, if specified) from a specific repository'''
     repo, tag = image.split(":", 1) if ":" in image else (image, "")
 
@@ -91,11 +95,11 @@ def clean_repo(image: str, remove: bool = False, quiet: bool = False) -> bool:
     if remove:
         tags = set(os.listdir(f"{repo}/_manifests/tags/"))
         if not tag or len(tags) == 1 and tag in tags:
-            remove_dir(repo, quiet)
+            remove_dir(repo, quiet, dry_run)
             return True
 
     if tag:
-        return clean_tag(repo, tag, remove, quiet)
+        return clean_tag(repo, tag, remove, quiet, dry_run)
 
     currents = set()
     for link in iglob(f"{repo}/_manifests/tags/*/current/link"):
@@ -103,9 +107,9 @@ def clean_repo(image: str, remove: bool = False, quiet: bool = False) -> bool:
             currents.add(infile.read()[len("sha256:"):])
     for index in iglob(f"{repo}/_manifests/tags/*/index/sha256/*"):
         if os.path.basename(index) not in currents:
-            remove_dir(index, quiet)
+            remove_dir(index, quiet, dry_run)
 
-    clean_revisions(repo, quiet)
+    clean_revisions(repo, quiet, dry_run)
     return True
 
 
@@ -172,7 +176,7 @@ class RegistryCleaner():
         self.registry_dir = self.get_registry_dir()
         os.environ[REGISTRY_DIR] = self.registry_dir
 
-    def __call__(self, images: list[str], remove: bool = False, quiet: bool = False):
+    def __call__(self, images: list[str], remove: bool = False, quiet: bool = False, dry_run: bool = False):
         try:
             os.chdir(f"{self.registry_dir}/docker/registry/v2/repositories")
         except OSError as err:
@@ -182,11 +186,14 @@ class RegistryCleaner():
 
         exit_status = 0
         for image in images:
-            if not clean_repo(image, remove, quiet):
+            if not clean_repo(image, remove, quiet, dry_run):
                 exit_status = 1
 
-        if not self.garbage_collect():
-            exit_status = 1
+        if dry_run:
+            print("Skipping the garbage collector")
+        else:
+            if not self.garbage_collect():
+                exit_status = 1
 
         self.client.close()
         return exit_status
@@ -265,6 +272,7 @@ def parse_args():
     parser.add_argument('-q', '--quiet', action='store_true')
     parser.add_argument('-x', '--remove', action='store_true')
     parser.add_argument('-V', '--version', action='store_true')
+    parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--podman', default=True, action='store_true')
     parser.add_argument('--docker', action='store_true')
     parser.add_argument('container', nargs='?')
@@ -304,6 +312,7 @@ def main():
         images=args.images,
         remove=args.remove,
         quiet=args.quiet,
+        dry_run=args.dry_run,
     )
     sys.exit(status)
 
