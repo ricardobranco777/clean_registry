@@ -25,7 +25,7 @@ from podman.errors import APIError, PodmanError
 
 import yaml
 
-VERSION = "2.0.1"
+VERSION = "2.8"
 
 REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"
 
