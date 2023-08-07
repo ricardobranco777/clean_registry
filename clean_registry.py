@@ -158,14 +158,10 @@ class RegistryCleaner():
 
         try:
             self.container = self.client.containers.get(container)
-            if use_docker:
-                self.info = self.client.api.inspect_container(container)
-            else:
-                self.info = self.container.inspect()
         except (RequestException, DockerException, APIError, PodmanError) as err:
             sys.exit(f"ERROR: {str(err)}")
 
-        if self.info['State']['Running']:
+        if self.container.attrs['State']['Running']:
             sys.exit("ERROR: Please stop the container {container} before cleaning")
 
         _, distribution, version = self.get_image_version()
@@ -216,14 +212,14 @@ class RegistryCleaner():
         if registry_dir:
             return registry_dir
 
-        for env in self.info['Config']['Env']:
+        for env in self.container.attrs['Config']['Env']:
             var, value = env.split("=", 1)
             if var == REGISTRY_DIR:
                 registry_dir = value
                 break
 
         if not registry_dir:
-            config_yml = self.info['Args'][0]
+            config_yml = self.container.attrs['Args'][0]
             data = yaml.load(self.get_file(config_yml), Loader=yaml.FullLoader)
             try:
                 registry_dir = data['storage']['filesystem']['rootdirectory']
@@ -235,7 +231,7 @@ class RegistryCleaner():
     def get_image_version(self) -> list[str]:
         '''Gets the Docker distribution version running on the container'''
         try:
-            if self.info['State']['Running']:
+            if self.container.attrs['State']['Running']:
                 data = self.container.exec_run("/bin/registry --version")
                 if isinstance(data, tuple):  # podman
                     data = data[1]
@@ -243,7 +239,7 @@ class RegistryCleaner():
                     data = data.output
             else:
                 data = self.client.containers.run(
-                    self.info['Config']['Image'], command="--version", remove=True
+                    self.container.attrs['Config']['Image'], command="--version", remove=True
                 )
             return data.decode('utf-8').split()
         except (RequestException, DockerException, APIError, PodmanError) as err:
