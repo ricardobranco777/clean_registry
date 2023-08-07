@@ -13,7 +13,7 @@ cleanup() {
 	sudo rm -rf "$directory"
 }
 
-trap "cleanup ; exit 1" ERR
+trap "cleanup ; exit 1" ERR INT QUIT
 
 get_random_port() {
 	read -r port_low port_high < /proc/sys/net/ipv4/ip_local_port_range
@@ -31,14 +31,12 @@ podman save "$scratch" | docker load
 podman build -t "$image:test" --pull .
 podman save "$image:test" | docker load
 
-DOCKER_SOCKET="/var/run/docker.sock"
+DOCKER_SOCKET="$(docker context inspect -f json default | jq -r '.[0].Endpoints.docker.Host')"
+DOCKER_SOCKET="${DOCKER_SOCKET#unix://}"
 PODMAN_SOCKET=$(podman info --format json | jq -r '.host.remoteSocket.path')
-
-#export CONTAINERS_REGISTRIES_CONF=tests/registries.conf
 
 for runtime in docker podman ; do
 	if [[ $runtime = docker ]] ; then
-		#export DOCKER_HOST="$(docker context inspect -f json default | jq -r '.[0].Endpoints.docker.Host')"
 		runtime_options=()
 		push_options=()
 	else

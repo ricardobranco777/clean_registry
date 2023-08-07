@@ -44,30 +44,30 @@ def is_container() -> bool:
     return os.getenv("container") == "podman" or os.path.isfile("/.dockerenv")
 
 
-def remove(path) -> None:
+def remove_dir(path: str, quiet: bool = False) -> None:
     '''Run rmtree() in verbose mode'''
     rmtree(path)
-    if not args.quiet:
+    if not quiet:
         print(f"removed directory {path}")
 
 
-def clean_revisions(repo: str) -> None:
+def clean_revisions(repo: str, quiet: bool = False) -> None:
     '''Remove the revision manifests that are not present in the tags directory'''
     revisions = set(os.listdir(f"{repo}/_manifests/revisions/sha256/"))
     manifests = set(map(os.path.basename, iglob(f"{repo}/_manifests/tags/*/*/sha256/*")))
     revisions.difference_update(manifests)
     for revision in revisions:
-        remove(f"{repo}/_manifests/revisions/sha256/{revision}")
+        remove_dir(f"{repo}/_manifests/revisions/sha256/{revision}", quiet)
 
 
-def clean_tag(repo: str, tag: str) -> bool:
+def clean_tag(repo: str, tag: str, remove: bool = False, quiet: bool = False) -> bool:
     '''Clean a specific repo:tag'''
     link = f"{repo}/_manifests/tags/{tag}/current/link"
     if not os.path.isfile(link):
         print(f"ERROR: No such tag: {tag} in repository {repo}", file=sys.stderr)
         return False
-    if args.remove:
-        remove(f"{repo}/_manifests/tags/{tag}")
+    if remove:
+        remove_dir(f"{repo}/_manifests/tags/{tag}", quiet)
     else:
         with open(link, encoding="utf-8") as infile:
             current = infile.read()[len("sha256:"):]
@@ -75,12 +75,12 @@ def clean_tag(repo: str, tag: str) -> bool:
         for index in os.listdir(path):
             if index == current:
                 continue
-            remove(f"{path}{index}")
-    clean_revisions(repo)
+            remove_dir(f"{path}{index}", quiet)
+    clean_revisions(repo, quiet)
     return True
 
 
-def clean_repo(image: str) -> bool:
+def clean_repo(image: str, remove: bool = False, quiet: bool = False) -> bool:
     '''Clean all tags (or a specific one, if specified) from a specific repository'''
     repo, tag = image.split(":", 1) if ":" in image else (image, "")
 
@@ -88,14 +88,14 @@ def clean_repo(image: str) -> bool:
         print(f"ERROR: No such repository: {repo}", file=sys.stderr)
         return False
 
-    if args.remove:
+    if remove:
         tags = set(os.listdir(f"{repo}/_manifests/tags/"))
         if not tag or len(tags) == 1 and tag in tags:
-            remove(repo)
+            remove_dir(repo, quiet)
             return True
 
     if tag:
-        return clean_tag(repo, tag)
+        return clean_tag(repo, tag, remove, quiet)
 
     currents = set()
     for link in iglob(f"{repo}/_manifests/tags/*/current/link"):
@@ -103,9 +103,9 @@ def clean_repo(image: str) -> bool:
             currents.add(infile.read()[len("sha256:"):])
     for index in iglob(f"{repo}/_manifests/tags/*/index/sha256/*"):
         if os.path.basename(index) not in currents:
-            remove(index)
+            remove_dir(index, quiet)
 
-    clean_revisions(repo)
+    clean_revisions(repo, quiet)
     return True
 
 
@@ -172,18 +172,17 @@ class RegistryCleaner():
         self.registry_dir = self.get_registry_dir()
         os.environ[REGISTRY_DIR] = self.registry_dir
 
-    def __call__(self):
+    def __call__(self, images: list[str], remove: bool = False, quiet: bool = False):
         try:
             os.chdir(f"{self.registry_dir}/docker/registry/v2/repositories")
         except OSError as err:
             sys.exit(f"ERROR: {str(err)}")
 
-        images = args.images or \
-            map(os.path.dirname, iglob("**/_manifests", recursive=True))
+        images = images or map(os.path.dirname, iglob("**/_manifests", recursive=True))
 
         exit_status = 0
         for image in images:
-            if not clean_repo(image):
+            if not clean_repo(image, remove, quiet):
                 exit_status = 1
 
         if not self.garbage_collect():
@@ -244,7 +243,7 @@ class RegistryCleaner():
         except (RequestException, DockerException, APIError, PodmanError) as err:
             sys.exit(f"ERROR: {str(err)}")
 
-    def garbage_collect(self) -> bool:
+    def garbage_collect(self, quiet: bool = False) -> bool:
         '''Runs garbage-collect'''
         command = "/bin/registry garbage-collect /etc/docker/registry/config.yml"
         with subprocess.Popen(
@@ -254,7 +253,7 @@ class RegistryCleaner():
         ) as proc:
             # It seems we have to consume stdout so we have a return code
             out = proc.stdout.read()
-            if not args.quiet:
+            if not quiet:
                 print(out.decode('utf-8'))
         return bool(proc.returncode == 0)
 
@@ -275,21 +274,6 @@ def parse_args():
 
 def main():
     '''Main function'''
-    if not is_container():
-        sys.exit("ERROR: This script should run inside a container!")
-
-    for image in args.images:
-        if not check_name(image):
-            sys.exit(f"ERROR: Invalid Docker repository/tag: {image}")
-
-    if args.remove and not args.images:
-        sys.exit("ERROR: The -x option requires that you specify at least one repository...")
-
-    cleaner = RegistryCleaner(container=args.container, use_docker=args.docker)
-    sys.exit(cleaner())
-
-
-if __name__ == "__main__":
     args = parse_args()
     if args.docker:
         args.podman = False
@@ -302,6 +286,29 @@ if __name__ == "__main__":
     elif not args.container:
         print(f'usage: {USAGE}')
         sys.exit(1)
+
+    if not is_container():
+        sys.exit("ERROR: This script should run inside a container!")
+
+    for image in args.images:
+        if not check_name(image):
+            sys.exit(f"ERROR: Invalid Docker repository/tag: {image}")
+
+    if args.remove and not args.images:
+        sys.exit("ERROR: The -x option requires that you specify at least one repository...")
+
+    status = RegistryCleaner(
+        container=args.container,
+        use_docker=args.docker,
+    )(
+        images=args.images,
+        remove=args.remove,
+        quiet=args.quiet,
+    )
+    sys.exit(status)
+
+
+if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
