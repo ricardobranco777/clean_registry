@@ -162,9 +162,6 @@ class RegistryCleaner():
         except (RequestException, DockerException, APIError, PodmanError) as err:
             sys.exit(f"ERROR: {str(err)}")
 
-        if os.path.basename(self.info['Config']['Image']) != "registry:2":
-            sys.exit(f"ERROR: The container {container} is not running the registry:2 image")
-
         if self.info['State']['Running']:
             sys.exit("ERROR: Please stop the container {container} before cleaning")
 
