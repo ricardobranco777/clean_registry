@@ -43,24 +43,22 @@ DOCKER_SOCKET="${DOCKER_SOCKET#unix://}"
 PODMAN_SOCKET=$(podman info --format json | jq -r '.host.remoteSocket.path')
 
 for runtime in docker podman ; do
-	if [[ $runtime = docker ]] ; then
-		runtime_options=()
-		push_options=()
-	else
+	if [[ $runtime = podman ]] ; then
 		export DOCKER_HOST="unix:///run/podman/podman.sock"
-		runtime_options=()
 		push_options=(--tls-verify=false)
+	else
+		push_options=()
 	fi
 
 	mkdir "$directory"
 	"$runtime" run -d --name "$registry" -e REGISTRY_STORAGE_DELETE_ENABLED=1 -e REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/var/registry -p "$random_port:5000" -v "$directory:/var/registry" registry:2
 
 	"$runtime" tag "$scratch" "$regclean:latest"
-	"$runtime" "${runtime_options[@]}" push "${push_options[@]}" "$regclean:latest"
+	"$runtime" push "${push_options[@]}" "$regclean:latest"
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 1 ]]
 
 	"$runtime" tag "$regclean:test" "$regclean:latest"
-	"$runtime" "${runtime_options[@]}" push "${push_options[@]}" "$regclean:latest"
+	"$runtime" push "${push_options[@]}" "$regclean:latest"
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 2 ]]
 
 	"$runtime" stop "$registry"

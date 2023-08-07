@@ -149,9 +149,8 @@ class RegistryCleaner():
             except (RequestException, DockerException) as err:
                 sys.exit(f"ERROR: {str(err)}")
         else:
-            base_url = os.environ['DOCKER_HOST'] = os.getenv('DOCKER_HOST', 'unix:///run/podman/podman.sock')
             try:
-                self.client = PodmanClient(base_url=base_url)
+                self.client = PodmanClient.from_env()
             except (APIError, PodmanError) as exc:
                 sys.exit(f"Broken Podman environment: {exc}")
             if not self.client.info()['host']['remoteSocket']["exists"]:
