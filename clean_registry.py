@@ -220,16 +220,9 @@ class RegistryCleaner():
     def get_image_version(self) -> list[str]:
         '''Gets the Docker distribution version running on the container'''
         try:
-            if self.container.attrs['State']['Running']:
-                data = self.container.exec_run("/bin/registry --version")
-                if isinstance(data, tuple):  # podman
-                    data = data[1]
-                else:
-                    data = data.output
-            else:
-                data = self.client.containers.run(
-                    self.container.attrs['Config']['Image'], command="--version", remove=True
-                )
+            data = self.client.containers.run(
+                self.container.attrs['Config']['Image'], command="--version", remove=True
+            )
             return data.decode('utf-8').split()
         except (RequestException, DockerException, APIError, PodmanError) as err:
             sys.exit(f"ERROR: {str(err)}")
