@@ -79,11 +79,10 @@ def clean_repo(image: str, remove: bool = False, dry_run: bool = False) -> None:
         print(f"ERROR: No such repository: {repo}", file=sys.stderr)
         return
 
-    if remove:
-        tags = set(os.listdir(f"{repo}/_manifests/tags"))
-        if not tag or len(tags) == 1 and tag in tags:
-            remove_dir(repo, dry_run)
-            return
+    # Remove repo if there's only one tag
+    if remove and (not tag or [tag] == os.listdir(f"{repo}/_manifests/tags")):
+        remove_dir(repo, dry_run)
+        return
 
     if tag:
         clean_tag(repo, tag, remove, dry_run)
