@@ -11,8 +11,10 @@ import tarfile
 import subprocess
 
 from argparse import ArgumentParser
+from contextlib import closing
 from glob import iglob
 from io import BytesIO
+from pathlib import Path
 from shutil import rmtree
 
 from packaging.version import Version
@@ -20,7 +22,7 @@ from requests.exceptions import RequestException
 
 import docker
 from docker.errors import DockerException
-from podman import PodmanClient
+import podman
 from podman.errors import APIError, PodmanError
 
 import yaml
@@ -150,7 +152,7 @@ class RegistryCleaner():
                 sys.exit(f"ERROR: {str(err)}")
         else:
             try:
-                self.client = PodmanClient.from_env()
+                self.client = podman.from_env()
             except (APIError, PodmanError) as exc:
                 sys.exit(f"Broken Podman environment: {exc}")
             if not self.client.info()['host']['remoteSocket']["exists"]:
@@ -253,7 +255,6 @@ class RegistryCleaner():
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT
         ) as proc:
-            # It seems we have to consume stdout so we have a return code
             out = proc.stdout.read()
             if not quiet:
                 print(out.decode('utf-8'))
@@ -275,8 +276,40 @@ def parse_args():
     return parser.parse_args()
 
 
+def print_versions():
+    '''Print useful information for debugging'''
+    print(f'{os.path.basename(sys.argv[0])} {VERSION}')
+    print(f'Python {sys.version}')
+    print(subprocess.check_output(shlex.split("/bin/registry --version")).decode("utf-8").strip())
+    with open("/etc/os-release", encoding="utf-8") as file:
+        osrel = {k: v.strip('"') for k, v in [line.split('=') for line in file.read().splitlines()]}
+    print(osrel['NAME'], osrel['VERSION_ID'])
+    try:
+        client = docker.from_env()
+        print(f"docker-py {docker.version.__version__}")
+        with closing(client):
+            print(client.version())
+    except (RequestException, DockerException):
+        pass
+    try:
+        client = podman.from_env()
+        print(f"podman-py {podman.version.__version__}")
+        with closing(client):
+            print(client.version())
+    except (ValueError, APIError, PodmanError):
+        pass
+
+
 def main():
     '''Main function'''
+    if not is_container() or not os.path.isfile("/bin/registry"):
+        sys.exit("ERROR: This script should run inside a registry:2 container!")
+
+    for var in ('CONTAINER_HOST', 'DOCKER_HOST'):
+        path = os.getenv(var)
+        if path and Path(path).is_socket() and "://" not in path:
+            os.environ[var] = f"unix://{path}"
+
     args = parse_args()
     if args.docker:
         args.podman = False
@@ -284,14 +317,11 @@ def main():
         print(f'usage: {USAGE}')
         sys.exit(0)
     elif args.version:
-        print(f'{sys.argv[0]} {VERSION}')
+        print_versions()
         sys.exit(0)
     elif not args.container:
         print(f'usage: {USAGE}')
         sys.exit(1)
-
-    if not is_container():
-        sys.exit("ERROR: This script should run inside a container!")
 
     for image in args.images:
         if not check_name(image):
