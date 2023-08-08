@@ -66,12 +66,12 @@ def clean_revisions(repo: str, quiet: bool = False, dry_run: bool = False) -> No
         remove_dir(f"{repo}/_manifests/revisions/sha256/{revision}", quiet, dry_run)
 
 
-def clean_tag(repo: str, tag: str, remove: bool = False, quiet: bool = False, dry_run: bool = False) -> bool:
+def clean_tag(repo: str, tag: str, remove: bool = False, quiet: bool = False, dry_run: bool = False) -> None:
     '''Clean a specific repo:tag'''
     link = f"{repo}/_manifests/tags/{tag}/current/link"
     if not os.path.isfile(link):
         print(f"ERROR: No such tag: {tag} in repository {repo}", file=sys.stderr)
-        return False
+        return
     if remove:
         remove_dir(f"{repo}/_manifests/tags/{tag}", quiet, dry_run)
     else:
@@ -83,25 +83,25 @@ def clean_tag(repo: str, tag: str, remove: bool = False, quiet: bool = False, dr
                 continue
             remove_dir(f"{path}{index}", quiet, dry_run)
     clean_revisions(repo, quiet, dry_run)
-    return True
 
 
-def clean_repo(image: str, remove: bool = False, quiet: bool = False, dry_run: bool = False) -> bool:
+def clean_repo(image: str, remove: bool = False, quiet: bool = False, dry_run: bool = False) -> None:
     '''Clean all tags (or a specific one, if specified) from a specific repository'''
     repo, tag = image.split(":", 1) if ":" in image else (image, "")
 
     if not os.path.isdir(repo):
         print(f"ERROR: No such repository: {repo}", file=sys.stderr)
-        return False
+        return
 
     if remove:
         tags = set(os.listdir(f"{repo}/_manifests/tags/"))
         if not tag or len(tags) == 1 and tag in tags:
             remove_dir(repo, quiet, dry_run)
-            return True
+            return
 
     if tag:
-        return clean_tag(repo, tag, remove, quiet, dry_run)
+        clean_tag(repo, tag, remove, quiet, dry_run)
+        return
 
     currents = set()
     for link in iglob(f"{repo}/_manifests/tags/*/current/link"):
@@ -112,7 +112,6 @@ def clean_repo(image: str, remove: bool = False, quiet: bool = False, dry_run: b
             remove_dir(index, quiet, dry_run)
 
     clean_revisions(repo, quiet, dry_run)
-    return True
 
 
 def check_name(image: str) -> bool:
@@ -173,27 +172,21 @@ class RegistryCleaner():
         self.registry_dir = self.get_registry_dir()
         os.environ[REGISTRY_DIR] = self.registry_dir
 
-    def __call__(self, images: list[str], remove: bool = False, quiet: bool = False, dry_run: bool = False):
+    def __call__(self, images: list[str], remove: bool = False, quiet: bool = False, dry_run: bool = False) -> None:
         try:
             os.chdir(f"{self.registry_dir}/docker/registry/v2/repositories")
         except OSError as err:
             sys.exit(f"ERROR: {str(err)}")
 
         images = images or map(os.path.dirname, iglob("**/_manifests", recursive=True))
-
-        exit_status = 0
         for image in images:
-            if not clean_repo(image, remove, quiet, dry_run):
-                exit_status = 1
+            clean_repo(image, remove, quiet, dry_run)
 
         if dry_run:
             print("Skipping the garbage collector")
         else:
-            if not self.garbage_collect():
-                exit_status = 1
-
+            self.garbage_collect()
         self.client.close()
-        return exit_status
 
     def get_file(self, path: str) -> bytes:
         '''Returns the contents of the specified file from the container'''
@@ -247,7 +240,7 @@ class RegistryCleaner():
         except (RequestException, DockerException, APIError, PodmanError) as err:
             sys.exit(f"ERROR: {str(err)}")
 
-    def garbage_collect(self, quiet: bool = False) -> bool:
+    def garbage_collect(self, quiet: bool = False) -> None:
         '''Runs garbage-collect'''
         command = "/bin/registry garbage-collect /etc/docker/registry/config.yml"
         with subprocess.Popen(
@@ -258,7 +251,6 @@ class RegistryCleaner():
             out = proc.stdout.read()
             if not quiet:
                 print(out.decode('utf-8'))
-        return bool(proc.returncode == 0)
 
 
 def parse_args():
@@ -330,7 +322,7 @@ def main():
     if args.remove and not args.images:
         sys.exit("ERROR: The -x option requires that you specify at least one repository...")
 
-    status = RegistryCleaner(
+    RegistryCleaner(
         container=args.container,
         use_docker=args.docker,
     )(
@@ -339,7 +331,6 @@ def main():
         quiet=args.quiet,
         dry_run=args.dry_run,
     )
-    sys.exit(status)
 
 
 if __name__ == "__main__":
