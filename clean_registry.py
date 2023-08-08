@@ -141,43 +141,28 @@ class RegistryCleaner():
     '''Simple callable class for Docker Registry cleaning duties'''
     def __init__(self, container: str, use_docker=False):
         if use_docker:
-            try:
-                self.client = docker.from_env()
-            except (RequestException, DockerException) as err:
-                sys.exit(f"ERROR: {str(err)}")
+            self.client = docker.from_env()
         else:
-            try:
-                self.client = podman.from_env()
-            except (APIError, PodmanError) as exc:
-                sys.exit(f"Broken Podman environment: {exc}")
+            self.client = podman.from_env()
             if not self.client.info()['host']['remoteSocket']["exists"]:
-                sys.exit("Please run systemctl --user enable --now podman.socket")
+                raise RuntimeError("Please run systemctl --user enable --now podman.socket")
 
-        try:
-            self.container = self.client.containers.get(container)
-        except (RequestException, DockerException, APIError, PodmanError) as err:
-            sys.exit(f"ERROR: {str(err)}")
-
+        self.container = self.client.containers.get(container)
         if self.container.attrs['State']['Running']:
-            sys.exit("ERROR: Please stop the container {container} before cleaning")
+            raise RuntimeError("Please stop the container {container} before cleaning")
 
         _, distribution, version = self.get_image_version()
         if distribution != "github.com/docker/distribution" or Version(version) < Version("v2.4.0"):
-            sys.exit("ERROR: You're not running Docker Registry 2.4.0+")
+            raise RuntimeError("You're not running Docker Registry 2.4.0+")
 
         self.registry_dir = self.get_registry_dir()
         os.environ[REGISTRY_DIR] = self.registry_dir
 
     def __call__(self, images: list[str], remove: bool = False, dry_run: bool = False) -> None:
-        try:
-            os.chdir(f"{self.registry_dir}/docker/registry/v2/repositories")
-        except OSError as err:
-            sys.exit(f"ERROR: {str(err)}")
-
+        os.chdir(f"{self.registry_dir}/docker/registry/v2/repositories")
         images = images or map(os.path.dirname, iglob("**/_manifests", recursive=True))
         for image in images:
             clean_repo(image, remove, dry_run)
-
         if dry_run:
             print("Skipping the garbage collector")
         else:
@@ -186,13 +171,10 @@ class RegistryCleaner():
 
     def get_file(self, path: str) -> bytes:
         '''Returns the contents of the specified file from the container'''
-        try:
-            with BytesIO(b"".join(_ for _ in self.container.get_archive(path)[0])) as stream:
-                with tarfile.open(fileobj=stream) as tar:
-                    with tar.extractfile(os.path.basename(path)) as file:
-                        data = file.read()
-        except (RequestException, DockerException, APIError, PodmanError) as err:
-            sys.exit(f"ERROR: {str(err)}")
+        with BytesIO(b"".join(_ for _ in self.container.get_archive(path)[0])) as stream:
+            with tarfile.open(fileobj=stream) as tar:
+                with tar.extractfile(os.path.basename(path)) as file:
+                    data = file.read()
         return data
 
     def get_registry_dir(self) -> str:
@@ -212,20 +194,16 @@ class RegistryCleaner():
             data = yaml.full_load(self.get_file(config_yml))
             try:
                 registry_dir = data['storage']['filesystem']['rootdirectory']
-            except KeyError:
-                sys.exit("ERROR: Unsupported storage driver")
+            except KeyError as exc:
+                raise RuntimeError("Unsupported storage driver") from exc
 
         return registry_dir
 
     def get_image_version(self) -> list[str]:
         '''Gets the Docker distribution version running on the container'''
-        try:
-            data = self.client.containers.run(
-                self.container.attrs['Config']['Image'], command="--version", remove=True
-            )
-            return data.decode('utf-8').split()
-        except (RequestException, DockerException, APIError, PodmanError) as err:
-            sys.exit(f"ERROR: {str(err)}")
+        return self.client.containers.run(
+            self.container.attrs['Config']['Image'], command="--version", remove=True
+        ).decode('utf-8').split()
 
     def garbage_collect(self) -> None:
         '''Runs garbage-collect'''
