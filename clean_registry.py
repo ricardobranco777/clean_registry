@@ -27,18 +27,8 @@ from podman.errors import APIError, PodmanError
 
 import yaml
 
+
 VERSION = "2.8.1"
-
-REGISTRY_DIR = "REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"
-
-USAGE = f"""{sys.argv[0]} [OPTIONS] CONTAINER [REPOSITORY[:TAG]]...
-Options:
-        -x, --remove    Remove the specified images or repositories.
-        -V, --version   Show version and exit.
-        --dry-run       Don't remove anything.
-        --podman        Use podman client (default).
-        --docker        Use docker client (default is podman).
-"""
 
 
 def is_container() -> bool:
@@ -139,13 +129,13 @@ def check_name(image: str) -> bool:
 
 class RegistryCleaner():
     '''Simple callable class for Docker Registry cleaning duties'''
-    def __init__(self, container: str, use_docker=False):
-        if use_docker:
-            self.client = docker.from_env()
-        else:
+    def __init__(self, container: str):
+        if os.getenv("CONTAINER_HOST"):
             self.client = podman.from_env()
             if not self.client.info()['host']['remoteSocket']["exists"]:
                 raise RuntimeError("Please run systemctl --user enable --now podman.socket")
+        else:
+            self.client = docker.from_env()
 
         self.container = self.client.containers.get(container)
         if self.container.attrs['State']['Running']:
@@ -156,7 +146,7 @@ class RegistryCleaner():
             raise RuntimeError("You're not running Docker Registry 2.4.0+")
 
         self.registry_dir = self.get_registry_dir()
-        os.environ[REGISTRY_DIR] = self.registry_dir
+        os.environ["REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"] = self.registry_dir
 
     def __call__(self, images: list[str], remove: bool = False, dry_run: bool = False) -> None:
         os.chdir(f"{self.registry_dir}/docker/registry/v2/repositories")
@@ -179,13 +169,13 @@ class RegistryCleaner():
 
     def get_registry_dir(self) -> str:
         '''Gets the Registry directory'''
-        registry_dir = os.getenv(REGISTRY_DIR)
+        registry_dir = os.getenv("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY")
         if registry_dir:
             return registry_dir
 
         for env in self.container.attrs['Config']['Env']:
             var, value = env.split("=", 1)
-            if var == REGISTRY_DIR:
+            if var == "REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY":
                 registry_dir = value
                 break
 
@@ -220,15 +210,18 @@ class RegistryCleaner():
 
 def parse_args():
     """Parse args"""
-    parser = ArgumentParser(usage=USAGE, add_help=False)
-    parser.add_argument('-h', '--help', action='store_true')
-    parser.add_argument('-x', '--remove', action='store_true')
-    parser.add_argument('-V', '--version', action='store_true')
-    parser.add_argument('--dry-run', action='store_true')
-    parser.add_argument('--podman', default=True, action='store_true')
-    parser.add_argument('--docker', action='store_true')
-    parser.add_argument('container', nargs='?')
-    parser.add_argument('images', nargs='*')
+    parser = ArgumentParser()
+    parser.add_argument(
+        '--dry-run', action='store_true',
+        help="Don't remove anything")
+    parser.add_argument(
+        '-x', '--remove', action='store_true',
+        help="Remove the specified images or repositories")
+    parser.add_argument(
+        '-V', '--version', action='store_true',
+        help="Show version and exit")
+    parser.add_argument('container', nargs='?', help="Registry container")
+    parser.add_argument('images', nargs='*', help="REPOSITORY:[TAG]")
     return parser.parse_args()
 
 
@@ -267,17 +260,9 @@ def main():
             os.environ[var] = f"unix://{path}"
 
     args = parse_args()
-    if args.docker:
-        args.podman = False
-    if args.help:
-        print(f'usage: {USAGE}')
-        sys.exit(0)
-    elif args.version:
+    if args.version:
         print_versions()
         sys.exit(0)
-    elif not args.container:
-        print(f'usage: {USAGE}')
-        sys.exit(1)
 
     for image in args.images:
         if not check_name(image):
@@ -288,7 +273,6 @@ def main():
 
     RegistryCleaner(
         container=args.container,
-        use_docker=args.docker,
     )(
         images=args.images,
         remove=args.remove,

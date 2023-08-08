@@ -46,20 +46,14 @@ PODMAN_SOCKET="${PODMAN_SOCKET#unix://}"
 CONTAINER_HOST="unix://$PODMAN_SOCKET"
 
 for runtime in docker podman ; do
+	options=(--rm --volumes-from "$registry")
 	if [[ $runtime = podman ]] ; then
+		options+=(-e CONTAINER_HOST="$CONTAINER_HOST" -v "$PODMAN_SOCKET:$PODMAN_SOCKET")
 		push_options=(--tls-verify=false)
 	else
+		options+=(-e DOCKER_HOST="$DOCKER_HOST" -v "$DOCKER_SOCKET:$DOCKER_SOCKET")
 		push_options=()
 	fi
-
-	options=(
-		--rm
-		-e DOCKER_HOST="$DOCKER_HOST"
-		-e CONTAINER_HOST="$CONTAINER_HOST"
-		--volumes-from "$registry"
-		-v "$DOCKER_SOCKET:$DOCKER_SOCKET"
-		-v "$PODMAN_SOCKET:$PODMAN_SOCKET"
-	)
 
 	mkdir "$directory"
 	# REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY is needed because of https://github.com/containers/podman/issues/19529
@@ -76,19 +70,19 @@ for runtime in docker podman ; do
 	"$runtime" stop "$registry"
 
 	echo -e "\nTEST: $runtime: Cleanup --dry-run\n"
-	"$runtime" run "${options[@]}" "$regclean:test" --"$runtime" --dry-run "$registry"
+	"$runtime" run "${options[@]}" "$regclean:test" --dry-run "$registry"
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 2 ]]
 
 	echo -e "\nTEST: $runtime: Cleanup\n"
-	"$runtime" run "${options[@]}" "$regclean:test" --"$runtime" "$registry"
+	"$runtime" run "${options[@]}" "$regclean:test" "$registry"
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 1 ]]
 
 	echo -e "\nTEST: $runtime: Remove image --dry-run\n"
-	"$runtime" run "${options[@]}" "$regclean:test" --"$runtime" --dry-run -x "$registry" "${regclean##*/}"
+	"$runtime" run "${options[@]}" "$regclean:test" --dry-run -x "$registry" "${regclean##*/}"
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 1 ]]
 
 	echo -e "\nTEST: $runtime: Remove image\n"
-	"$runtime" run "${options[@]}" "$regclean:test" --"$runtime" -x "$registry" "${regclean##*/}"
+	"$runtime" run "${options[@]}" "$regclean:test" -x "$registry" "${regclean##*/}"
 	[ ! -d "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" ]
 
 	"$runtime" rm -vf "$registry"

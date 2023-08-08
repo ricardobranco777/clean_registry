@@ -26,13 +26,17 @@ With Docker Registry >= 2.7.0 you can run the garbage collector with the `-m` (`
 ## Usage
 
 ```
-Usage: clean_registry.py [OPTIONS] CONTAINER [REPOSITORY[:TAG]]...
-Options:
-        -x, --remove    Remove the specified images or repositories.
-        -V, --version   Show version and exit.
-        --dry-run       Don't remove anything.
-        --podman        Use podman client (default).
-        --docker        Use docker client (default is podman).
+usage: clean_registry.py [-h] [--dry-run] [-x] [-V] container [images ...]
+
+positional arguments:
+  container      Registry container
+  images         REPOSITORY:[TAG]
+
+options:
+  -h, --help     show this help message and exit
+  --dry-run      Don't remove anything
+  -x, --remove   Remove the specified images or repositories
+  -V, --version  Show version and exit
 ```
 
 ## Docker usage with local Docker setup
