@@ -235,8 +235,9 @@ class RegistryCleaner():
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT
         ) as proc:
-            out = proc.stdout.read()
-            print(out.decode('utf-8'))
+            for line in proc.stdout:
+                print(line.decode('utf-8'), end='')
+            proc.communicate()  # Wait for the process to complete
 
 
 def parse_args():
