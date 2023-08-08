@@ -57,7 +57,7 @@ def remove_dir(path: str, dry_run: bool = False) -> None:
 
 def clean_revisions(repo: str, dry_run: bool = False) -> None:
     '''Remove the revision manifests that are not present in the tags directory'''
-    revisions = set(os.listdir(f"{repo}/_manifests/revisions/sha256/"))
+    revisions = set(os.listdir(f"{repo}/_manifests/revisions/sha256"))
     manifests = set(map(os.path.basename, iglob(f"{repo}/_manifests/tags/*/*/sha256/*")))
     revisions.difference_update(manifests)
     for revision in revisions:
@@ -73,26 +73,24 @@ def clean_tag(repo: str, tag: str, remove: bool = False, dry_run: bool = False) 
     if remove:
         remove_dir(f"{repo}/_manifests/tags/{tag}", dry_run)
     else:
-        with open(link, encoding="utf-8") as infile:
-            current = infile.read()[len("sha256:"):]
-        path = f"{repo}/_manifests/tags/{tag}/index/sha256/"
+        with open(link, encoding="utf-8") as file:
+            current = file.read()[len("sha256:"):]
+        path = f"{repo}/_manifests/tags/{tag}/index/sha256"
         for index in os.listdir(path):
-            if index == current:
-                continue
-            remove_dir(f"{path}{index}", dry_run)
+            if index != current:
+                remove_dir(f"{path}/{index}", dry_run)
     clean_revisions(repo, dry_run)
 
 
 def clean_repo(image: str, remove: bool = False, dry_run: bool = False) -> None:
     '''Clean all tags (or a specific one, if specified) from a specific repository'''
     repo, tag = image.split(":", 1) if ":" in image else (image, "")
-
     if not os.path.isdir(repo):
         print(f"ERROR: No such repository: {repo}", file=sys.stderr)
         return
 
     if remove:
-        tags = set(os.listdir(f"{repo}/_manifests/tags/"))
+        tags = set(os.listdir(f"{repo}/_manifests/tags"))
         if not tag or len(tags) == 1 and tag in tags:
             remove_dir(repo, dry_run)
             return
@@ -103,8 +101,8 @@ def clean_repo(image: str, remove: bool = False, dry_run: bool = False) -> None:
 
     currents = set()
     for link in iglob(f"{repo}/_manifests/tags/*/current/link"):
-        with open(link, encoding="utf-8") as infile:
-            currents.add(infile.read()[len("sha256:"):])
+        with open(link, encoding="utf-8") as file:
+            currents.add(file.read()[len("sha256:"):])
     for index in iglob(f"{repo}/_manifests/tags/*/index/sha256/*"):
         if os.path.basename(index) not in currents:
             remove_dir(index, dry_run)
@@ -136,7 +134,7 @@ def check_name(image: str) -> bool:
         for path in repo.split("/")
     )
 
-    return len(image) < 256 and tag_valid and repo_valid
+    return bool(len(image) < 256 and tag_valid and repo_valid)
 
 
 class RegistryCleaner():
@@ -189,12 +187,10 @@ class RegistryCleaner():
     def get_file(self, path: str) -> bytes:
         '''Returns the contents of the specified file from the container'''
         try:
-            with BytesIO(b"".join(
-                    _ for _ in self.container.get_archive(path)[0]
-            )) as buf, tarfile.open(fileobj=buf) \
-                    as tar, tar.extractfile(os.path.basename(path)) \
-                    as infile:
-                data = infile.read()
+            with BytesIO(b"".join(_ for _ in self.container.get_archive(path)[0])) as stream:
+                with tarfile.open(fileobj=stream) as tar:
+                    with tar.extractfile(os.path.basename(path)) as file:
+                        data = file.read()
         except (RequestException, DockerException, APIError, PodmanError) as err:
             sys.exit(f"ERROR: {str(err)}")
         return data
@@ -213,7 +209,7 @@ class RegistryCleaner():
 
         if not registry_dir:
             config_yml = self.container.attrs['Args'][0]
-            data = yaml.load(self.get_file(config_yml), Loader=yaml.FullLoader)
+            data = yaml.full_load(self.get_file(config_yml))
             try:
                 registry_dir = data['storage']['filesystem']['rootdirectory']
             except KeyError:
