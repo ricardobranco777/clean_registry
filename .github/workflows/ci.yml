@@ -1,14 +1,13 @@
 name: CI
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
-  build:
+  lint:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.11"]
-
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}
@@ -17,7 +16,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          sudo apt install podman
           python -m pip install --upgrade pip
           pip install -r requirements-test.txt
       - name: flake8
@@ -27,6 +25,21 @@ jobs:
       - name: pylint
         run: |
           make pylint
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: |
+          sudo apt install podman
       - name: e2e
         run: |
           make e2e
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: shellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: 'tests/'
