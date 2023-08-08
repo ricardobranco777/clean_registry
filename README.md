@@ -29,7 +29,6 @@ With Docker Registry >= 2.7.0 you can run the garbage collector with the `-m` (`
 Usage: clean_registry.py [OPTIONS] CONTAINER [REPOSITORY[:TAG]]...
 Options:
         -x, --remove    Remove the specified images or repositories.
-        -q, --quiet     Supress non-error messages.
         -V, --version   Show version and exit.
         --dry-run       Don't remove anything.
         --podman        Use podman client (default).
