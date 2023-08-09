@@ -3,6 +3,7 @@
 Docker Registry cleaner
 """
 
+import json
 import logging
 import os
 import re
@@ -17,17 +18,14 @@ from glob import iglob
 from io import BytesIO
 from pathlib import Path
 from shutil import rmtree
-
 from packaging.version import Version
-from requests.exceptions import RequestException
 
 import docker
 from docker.errors import DockerException
 import podman
 from podman.errors import APIError, PodmanError
-
+from requests.exceptions import RequestException
 import yaml
-
 
 VERSION = "2.8.1"
 
@@ -126,12 +124,7 @@ class RegistryCleaner():
         os.environ["REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"] = self.registry_dir
 
         if self.container is not None:
-            if self.container.attrs['State']['Running'] or self.is_writable(self.registry_dir):
-                raise RuntimeError("Please stop the container {container} before cleaning")
-
-            _, distribution, version = self.get_image_version()
-            if distribution != "github.com/docker/distribution" or Version(version) < Version("v2.4.0"):
-                raise RuntimeError("You're not running Docker Registry 2.4.0+")
+            self.is_safe()
 
     def __call__(self, images: list[str], remove: bool = False, dry_run: bool = False) -> None:
         os.chdir(f"{self.registry_dir}/docker/registry/v2/repositories")
@@ -181,6 +174,31 @@ class RegistryCleaner():
         return self.client.containers.run(
             self.container.attrs['Config']['Image'], command="--version", remove=True
         ).decode('utf-8').split()
+
+    def is_safe(self):
+        '''
+        Raises RuntimeError if the registry container is not v2.4.0+
+        or is either running, not in maintenance mode and volume is mounted read-write
+        '''
+        _, distribution, version = self.get_image_version()
+        if distribution != "github.com/docker/distribution" or Version(version) < Version("v2.4.0"):
+            raise RuntimeError("Registry container is not running Docker Registry 2.4.0+")
+
+        if not self.container.attrs['State']['Running']:
+            return
+
+        # Note: REGISTRY_STORAGE_MAINTENANCE_READONLY_ENABLED doesn't work because of
+        # https://github.com/distribution/distribution/issues/2974
+        value = os.getenv("REGISTRY_STORAGE_MAINTENANCE_READONLY")
+        if value:
+            try:
+                if json.loads(value)["enabled"] is True:
+                    return
+            except (KeyError, json.JSONDecodeError) as err:
+                logging.error("REGISTRY_STORAGE_MAINTENANCE_READONLY: %s", err)
+            raise RuntimeError("Registry container is not in maintenance mode")
+        if self.is_writable(self.registry_dir):
+            raise RuntimeError("Registry container is running in production mode and volume is writable")
 
     def is_writable(self, directory: str) -> bool:
         '''Returns True if the directory is mounted read-write on the registry container'''
