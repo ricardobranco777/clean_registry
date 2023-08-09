@@ -62,7 +62,3 @@ Paths other than ``/root/.docker`` path may be specified with the ``DOCKER_CERT_
 ## Podman
 
 `alias docker=podman`
-
-## TODO
-
-- Add unit tests

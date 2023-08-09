@@ -25,6 +25,9 @@ jobs:
       - name: pylint
         run: |
           make pylint
+      - name: pytest
+        run: |
+          make pytest
   e2e:
     runs-on: ubuntu-latest
     steps:

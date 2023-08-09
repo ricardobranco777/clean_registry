@@ -1,7 +1,7 @@
 FILES=*.py
 
 .PHONY: all
-all: flake8 pylint
+all: flake8 pylint pytest
 
 .PHONY: flake8
 flake8:
@@ -9,7 +9,11 @@ flake8:
 
 .PHONY: pylint
 pylint:
-	@pylint --disable=line-too-long $(FILES)
+	@PYTHONPATH=clean_registry/ pylint --disable=line-too-long $(FILES)
+
+.PHONY: pytest
+pytest:
+	@pytest -v
 
 .PHONY: e2e
 e2e:
