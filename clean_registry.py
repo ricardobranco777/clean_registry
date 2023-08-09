@@ -157,7 +157,7 @@ class RegistryCleaner():
 
         if not registry_dir:
             if self.container is not None:
-                config_yml = self.container.attrs['Args'][0]
+                config_yml = self.container.attrs['Args'][-1]
                 data = yaml.full_load(self.get_file(config_yml))
             else:
                 with open("/etc/docker/registry/config.yml", encoding="utf-8") as file:
