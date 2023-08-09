@@ -4,19 +4,12 @@ set -e
 
 cleanup() {
 	set +e
-	echo -e "\nCleaning up from test..."
+	echo -e "\nCleaning up for $runtime\n"
 	for runtime in podman docker ; do
-		image_ids=()
-		for image in "$regclean:test" "$regclean:latest" "$scratch" ; do
-			images_ids+=("$(docker images --no-trunc --format '{{.ID}}' "$image")")
-			"$runtime" rmi "$image"
-		done
-		images_ids+=("$(docker images --no-trunc --format '{{.ID}}' "$regclean")")
-		for image_id in "${image_ids[@]}" ; do
-			"$runtime" rmi "$image_id"
-		done
+		"$runtime" rm -vf "$registry"
+		# shellcheck disable=SC2046
+		"$runtime" rmi -f $("$runtime" images --no-trunc --format '{{.ID}}' "localhost:$random_port/*" | sort -u)
 	done
-	podman rm -vf "$registry"
 	sudo rm -rf "$directory"
 }
 
@@ -30,7 +23,7 @@ get_random_port() {
 random_port=$(get_random_port)
 directory="$PWD/registry$random_port"
 regclean="localhost:$random_port/clean_registry"
-scratch="localhost/scratch$random_port"
+scratch="localhost:$random_port/scratch"
 registry="registry$random_port"
 
 # Build once, load anywhere...

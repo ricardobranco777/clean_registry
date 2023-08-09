@@ -204,7 +204,7 @@ class RegistryCleaner():
                 stderr=subprocess.STDOUT
         ) as proc:
             for line in proc.stdout:
-                logging.info(line.decode('utf-8'), end='')
+                logging.info(line.decode('utf-8').rstrip())
             proc.communicate()  # Wait for the process to complete
 
 
@@ -215,9 +215,9 @@ def parse_args():
         '--dry-run', action='store_true',
         help="Don't remove anything")
     parser.add_argument(
-        '-l', '--log', default='error',
+        '-l', '--log', default='info',
         choices='debug info warning error critical'.split(),
-        help="Log level")
+        help="Log level (default is info)")
     parser.add_argument(
         '-x', '--remove', action='store_true',
         help="Remove the specified images or repositories")
