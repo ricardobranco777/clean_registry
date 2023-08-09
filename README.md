@@ -56,12 +56,14 @@ docker run --rm --volumes-from registry -v /var/run/docker.sock:/var/run/docker.
 
 NOTES:
 - To directly work on a directory you can specify a null container as empty string:
-
-`docker run --rm -e REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/some/directory ghcr.io/ricardobranco777/clean_registry [--dry-run] [-x] "" [REPOSITORY[:TAG]...`
+```bash
+docker run --rm -e REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/some/directory ghcr.io/ricardobranco777/clean_registry [--dry-run] [-x] "" [REPOSITORY[:TAG]...
+```
 
 - The path to the socket can be found with:
-
-`docker context inspect -f json default | jq -r '.[0].Endpoints.docker.Host'`
+```bash
+docker context inspect -f json default | jq -r '.[0].Endpoints.docker.Host'`
+```
 
 ### With [remote Docker setup](https://docs.docker.com/engine/security/protect-access/)
 
