@@ -127,6 +127,18 @@ def check_name(image: str) -> bool:
     return bool(len(image) < 256 and tag_valid and repo_valid)
 
 
+def run_command(command: list) -> int:
+    '''Run command'''
+    with subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT
+    ) as proc:
+        for line in proc.stdout:
+            logging.info(line.decode('utf-8').rstrip())
+        return proc.wait()
+
+
 class RegistryCleaner():
     '''Simple callable class for Docker Registry cleaning duties'''
     def __init__(self, container: str):
@@ -153,10 +165,7 @@ class RegistryCleaner():
         images = images or map(os.path.dirname, iglob("**/_manifests", recursive=True))
         for image in images:
             clean_repo(image, remove, dry_run)
-        if dry_run:
-            logging.info("Skipping the garbage collector")
-        else:
-            self.garbage_collect()
+        self.garbage_collect(dry_run)
         self.client.close()
 
     def get_file(self, path: str) -> bytes:
@@ -195,17 +204,16 @@ class RegistryCleaner():
             self.container.attrs['Config']['Image'], command="--version", remove=True
         ).decode('utf-8').split()
 
-    def garbage_collect(self) -> None:
+    def garbage_collect(self, dry_run: bool = False) -> None:
         '''Runs garbage-collect'''
-        command = "/bin/registry garbage-collect /etc/docker/registry/config.yml"
-        with subprocess.Popen(
-                shlex.split(command),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT
-        ) as proc:
-            for line in proc.stdout:
-                logging.info(line.decode('utf-8').rstrip())
-            proc.communicate()  # Wait for the process to complete
+        command = shlex.split("/bin/registry garbage-collect")
+        if dry_run:
+            command.append("--dry-run")
+        command.append("/etc/docker/registry/config.yml")
+        logging.debug("Running %s", shlex.join(command))
+        status = run_command(command)
+        if status != 0:
+            logging.error("Command returned %d", status)
 
 
 def parse_args():
