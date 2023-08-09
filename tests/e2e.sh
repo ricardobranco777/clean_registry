@@ -35,8 +35,8 @@ podman save "$regclean:test" | docker load
 DOCKER_HOST="$(docker context inspect -f json default | jq -r '.[0].Endpoints.docker.Host')"
 DOCKER_SOCKET="${DOCKER_HOST#unix://}"
 PODMAN_SOCKET="$(podman info --format json | jq -r '.host.remoteSocket.path')"
+CONTAINER_HOST="$PODMAN_SOCKET"
 PODMAN_SOCKET="${PODMAN_SOCKET#unix://}"
-CONTAINER_HOST="unix://$PODMAN_SOCKET"
 
 for runtime in docker podman ; do
 	options=(--rm --volumes-from "$registry")
@@ -50,7 +50,7 @@ for runtime in docker podman ; do
 
 	mkdir "$directory"
 	# REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY is needed because of https://github.com/containers/podman/issues/19529
-	"$runtime" run -d --name "$registry" -e REGISTRY_STORAGE_DELETE_ENABLED=1 -e REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/var/registry -p "$random_port:5000" -v "$directory:/var/registry" registry:2
+	"$runtime" run -d --name "$registry" -e REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/var/registry -p "$random_port:5000" -v "$directory:/var/registry" registry:2
 
 	"$runtime" tag "$scratch" "$regclean:latest"
 	"$runtime" push "${runtime_options[@]}" "$regclean:latest"
