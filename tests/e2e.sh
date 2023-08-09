@@ -4,7 +4,7 @@ set -e
 
 cleanup() {
 	set +e
-	unset DOCKER_HOST
+	echo -e "\nCleaning up from test..."
 	for runtime in podman docker ; do
 		image_ids=()
 		for image in "$regclean:test" "$regclean:latest" "$scratch" ; do
@@ -20,7 +20,7 @@ cleanup() {
 	sudo rm -rf "$directory"
 }
 
-trap "cleanup ; exit 1" ERR INT QUIT
+trap 'cleanup ; echo -e "\nFAILED" ; exit 1' ERR INT QUIT
 
 get_random_port() {
 	read -r port_low port_high < /proc/sys/net/ipv4/ip_local_port_range
@@ -49,10 +49,10 @@ for runtime in docker podman ; do
 	options=(--rm --volumes-from "$registry")
 	if [[ $runtime = podman ]] ; then
 		options+=(-e CONTAINER_HOST="$CONTAINER_HOST" -v "$PODMAN_SOCKET:$PODMAN_SOCKET")
-		push_options=(--tls-verify=false)
+		runtime_options=(--tls-verify=false)
 	else
 		options+=(-e DOCKER_HOST="$DOCKER_HOST" -v "$DOCKER_SOCKET:$DOCKER_SOCKET")
-		push_options=()
+		runtime_options=()
 	fi
 
 	mkdir "$directory"
@@ -60,11 +60,11 @@ for runtime in docker podman ; do
 	"$runtime" run -d --name "$registry" -e REGISTRY_STORAGE_DELETE_ENABLED=1 -e REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/var/registry -p "$random_port:5000" -v "$directory:/var/registry" registry:2
 
 	"$runtime" tag "$scratch" "$regclean:latest"
-	"$runtime" push "${push_options[@]}" "$regclean:latest"
+	"$runtime" push "${runtime_options[@]}" "$regclean:latest"
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 1 ]]
 
 	"$runtime" tag "$regclean:test" "$regclean:latest"
-	"$runtime" push "${push_options[@]}" "$regclean:latest"
+	"$runtime" push "${runtime_options[@]}" "$regclean:latest"
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 2 ]]
 
 	"$runtime" stop "$registry"
@@ -76,6 +76,11 @@ for runtime in docker podman ; do
 	echo -e "\nTEST: $runtime: Cleanup\n"
 	"$runtime" run "${options[@]}" "$regclean:test" "$registry"
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 1 ]]
+
+	# Image should be pullable
+	"$runtime" start "$registry"
+	"$runtime" pull "${runtime_options[@]}" "$regclean:latest"
+	"$runtime" stop "$registry"
 
 	echo -e "\nTEST: $runtime: Remove image --dry-run\n"
 	"$runtime" run "${options[@]}" "$regclean:test" --dry-run -x "$registry" "${regclean##*/}"
@@ -90,3 +95,5 @@ for runtime in docker podman ; do
 done
 
 cleanup
+
+echo -e "\nPASSED"
