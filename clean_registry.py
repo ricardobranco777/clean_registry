@@ -3,6 +3,7 @@
 Docker Registry cleaner
 """
 
+import logging
 import os
 import re
 import shlex
@@ -39,10 +40,10 @@ def is_container() -> bool:
 def remove_dir(path: str, dry_run: bool = False) -> None:
     '''Run rmtree() in verbose mode'''
     if dry_run:
-        print(f"directory {path} skipped due to dry-run")
+        logging.info("directory %s skipped due to dry-run", path)
         return
     rmtree(path)
-    print(f"removed directory {path}")
+    logging.info("removed directory %s", path)
 
 
 def clean_revisions(repo: str, dry_run: bool = False) -> None:
@@ -58,7 +59,7 @@ def clean_tag(repo: str, tag: str, remove: bool = False, dry_run: bool = False) 
     '''Clean a specific repo:tag'''
     link = f"{repo}/_manifests/tags/{tag}/current/link"
     if not os.path.isfile(link):
-        print(f"ERROR: No such tag: {tag} in repository {repo}", file=sys.stderr)
+        logging.error("No such tag: %s in repository %s", tag, repo)
         return
     if remove:
         remove_dir(f"{repo}/_manifests/tags/{tag}", dry_run)
@@ -76,7 +77,7 @@ def clean_repo(image: str, remove: bool = False, dry_run: bool = False) -> None:
     '''Clean all tags (or a specific one, if specified) from a specific repository'''
     repo, tag = image.split(":", 1) if ":" in image else (image, "")
     if not os.path.isdir(repo):
-        print(f"ERROR: No such repository: {repo}", file=sys.stderr)
+        logging.error("No such repository: %s", repo)
         return
 
     # Remove repo if there's only one tag
@@ -153,7 +154,7 @@ class RegistryCleaner():
         for image in images:
             clean_repo(image, remove, dry_run)
         if dry_run:
-            print("Skipping the garbage collector")
+            logging.info("Skipping the garbage collector")
         else:
             self.garbage_collect()
         self.client.close()
@@ -203,7 +204,7 @@ class RegistryCleaner():
                 stderr=subprocess.STDOUT
         ) as proc:
             for line in proc.stdout:
-                print(line.decode('utf-8'), end='')
+                logging.info(line.decode('utf-8'), end='')
             proc.communicate()  # Wait for the process to complete
 
 
@@ -214,6 +215,10 @@ def parse_args():
         '--dry-run', action='store_true',
         help="Don't remove anything")
     parser.add_argument(
+        '-l', '--log', default='error',
+        choices='debug info warning error critical'.split(),
+        help="Log level")
+    parser.add_argument(
         '-x', '--remove', action='store_true',
         help="Remove the specified images or repositories")
     parser.add_argument(
@@ -221,7 +226,7 @@ def parse_args():
         help="Show version and exit")
     parser.add_argument('container', nargs='?', help="Registry container")
     parser.add_argument('images', nargs='*', help="REPOSITORY:[TAG]")
-    return parser.parse_args()
+    return parser
 
 
 def print_versions():
@@ -258,10 +263,14 @@ def main():
         if path and Path(path).is_socket() and "://" not in path:
             os.environ[var] = f"unix://{path}"
 
-    args = parse_args()
+    parser = parse_args()
+    args = parser.parse_args()
     if args.version:
         print_versions()
         sys.exit(0)
+    if not args.container:
+        parser.print_usage()
+        sys.exit(1)
 
     for image in args.images:
         if not check_name(image):
@@ -269,6 +278,9 @@ def main():
 
     if args.remove and not args.images:
         sys.exit("ERROR: The -x option requires that you specify at least one repository...")
+
+    fmt = "%(asctime)s %(levelname)-8s %(message)s"
+    logging.basicConfig(format=fmt, stream=sys.stderr, level=args.log.upper())
 
     RegistryCleaner(
         container=args.container,

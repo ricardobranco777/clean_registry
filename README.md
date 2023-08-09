@@ -35,6 +35,8 @@ positional arguments:
 options:
   -h, --help     show this help message and exit
   --dry-run      Don't remove anything
+  -l {debug,info,warning,error,critical}, --log {debug,info,warning,error,critical}
+                        Log level
   -x, --remove   Remove the specified images or repositories
   -V, --version  Show version and exit
 ```
