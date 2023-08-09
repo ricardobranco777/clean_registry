@@ -126,8 +126,7 @@ class RegistryCleaner():
 
     def is_safe(self):
         '''
-        Raises RuntimeError if the registry container is not v2.4.0+
-        or is either running, not in maintenance mode and volume is mounted read-write
+        Raises RuntimeError if the registry container is not v2.4.0+ or is not running in maintenance mode
         '''
         distribution, version = self.client.containers.run(
             self.container.attrs['Config']['Image'], command="--version", remove=True
@@ -147,23 +146,13 @@ class RegistryCleaner():
                     return
             except (KeyError, json.JSONDecodeError) as err:
                 logging.error("REGISTRY_STORAGE_MAINTENANCE_READONLY: %s", err)
-            raise RuntimeError("Registry container is not in maintenance mode")
-        try:
-            if self.config['storage']['maintenance']['readonly']['enabled']:
-                return
-            raise RuntimeError("Registry container is not in maintenance mode")
-        except KeyError:
-            pass
-
-        if self.is_writable(self.registry_dir):
-            raise RuntimeError("Registry container is running in production mode and volume is writable")
-
-    def is_writable(self, directory: str) -> bool:
-        '''Returns True if the directory is mounted read-write on the registry container'''
-        for mount in self.container.attrs['Mounts']:
-            if mount['Destination'] == directory:
-                return mount['RW']
-        return False
+        else:
+            try:
+                if self.config['storage']['maintenance']['readonly']['enabled']:
+                    return
+            except KeyError:
+                pass
+        raise RuntimeError("Registry container is not in maintenance mode")
 
     def garbage_collect(self, dry_run: bool = False) -> None:
         '''Runs garbage-collect'''
