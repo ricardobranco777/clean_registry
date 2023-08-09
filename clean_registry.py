@@ -13,7 +13,7 @@ import tarfile
 import subprocess
 
 from argparse import ArgumentParser
-from contextlib import closing
+from contextlib import chdir, closing
 from glob import iglob
 from io import BytesIO
 from pathlib import Path
@@ -33,41 +33,6 @@ VERSION = "2.8.1"
 def is_container() -> bool:
     '''Returns True if we're inside a Podman/Docker container, False otherwise.'''
     return os.getenv("container") == "podman" or os.path.isfile("/.dockerenv")
-
-
-def remove_dir(path: str, dry_run: bool = False) -> None:
-    '''Run rmtree() in verbose mode'''
-    if dry_run:
-        logging.info("directory %s skipped due to dry-run", path)
-        return
-    rmtree(path)
-    logging.info("removed directory %s", path)
-
-
-def clean_tag(repo: str, tag: str, remove: bool = False, dry_run: bool = False) -> None:
-    '''Clean a specific repo:tag'''
-    link = f"{repo}/_manifests/tags/{tag}/current/link"
-    if not os.path.isfile(link):
-        logging.error("No such tag: %s in repository %s", tag, repo)
-        return
-    if remove:
-        remove_dir(f"{repo}/_manifests/tags/{tag}", dry_run)
-
-
-def clean_repo(image: str, remove: bool = False, dry_run: bool = False) -> None:
-    '''Clean all tags (or a specific one, if specified) from a specific repository'''
-    repo, tag = image.split(":", 1) if ":" in image else (image, "")
-    if not os.path.isdir(repo):
-        logging.error("No such repository: %s", repo)
-        return
-
-    # Remove repo if there's only one tag
-    if remove and (not tag or [tag] == os.listdir(f"{repo}/_manifests/tags")):
-        remove_dir(repo, dry_run)
-        return
-
-    if tag:
-        clean_tag(repo, tag, remove, dry_run)
 
 
 def check_name(image: str) -> bool:
@@ -122,15 +87,16 @@ class RegistryCleaner():
         self.container = self.client.containers.get(container) if container else None
         self.registry_dir = self.get_registry_dir()
         os.environ["REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"] = self.registry_dir
+        self._basedir = Path(f"{self.registry_dir}/docker/registry/v2/repositories")
 
         if self.container is not None:
             self.is_safe()
 
     def __call__(self, images: list[str], remove: bool = False, dry_run: bool = False) -> None:
-        os.chdir(f"{self.registry_dir}/docker/registry/v2/repositories")
-        images = images or map(os.path.dirname, iglob("**/_manifests", recursive=True))
+        with chdir(f"{self.registry_dir}/docker/registry/v2/repositories"):
+            images = images or map(os.path.dirname, iglob("**/_manifests"))
         for image in images:
-            clean_repo(image, remove, dry_run)
+            self.clean_repo(image, remove, dry_run)
         self.garbage_collect(dry_run)
         self.client.close()
 
@@ -217,6 +183,38 @@ class RegistryCleaner():
         status = run_command(command)
         if status != 0:
             logging.error("Command returned %d", status)
+
+    def remove_dir(self, path: str, dry_run: bool = False) -> None:
+        '''Run rmtree() in verbose mode'''
+        if dry_run:
+            logging.info("directory %s skipped due to dry-run", path)
+            return
+        rmtree(self._basedir / path)
+        logging.info("removed directory %s", path)
+
+    def clean_tag(self, repo: str, tag: str, remove: bool = False, dry_run: bool = False) -> None:
+        '''Clean a specific repo:tag'''
+        link = self._basedir / f"{repo}/_manifests/tags/{tag}/current/link"
+        if not link.is_file():
+            logging.error("No such tag: %s in repository %s", tag, repo)
+            return
+        if remove:
+            self.remove_dir(f"{repo}/_manifests/tags/{tag}", dry_run)
+
+    def clean_repo(self, image: str, remove: bool = False, dry_run: bool = False) -> None:
+        '''Clean all tags (or a specific one, if specified) from a specific repository'''
+        repo, tag = image.split(":", 1) if ":" in image else (image, "")
+        repodir = self._basedir / repo
+        if not repodir.is_dir():
+            logging.error("No such repository: %s", repo)
+            return
+        # Remove repo if there's only one tag
+        tagsdir = self._basedir / f"{repo}/_manifests/tags"
+        if remove and (not tag or [tag] == list(tagsdir.iterdir())):
+            self.remove_dir(repo, dry_run)
+            return
+        if tag:
+            self.clean_tag(repo, tag, remove, dry_run)
 
 
 def parse_args():
