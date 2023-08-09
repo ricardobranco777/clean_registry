@@ -26,7 +26,8 @@ docker run --rm --volumes-from CONTAINER [DOCKER_OPTIONS...] ghcr.io/ricardobran
 
 ## BUGS / LIMITATIONS
 
-- The `--delete-untagged` option added to [Docker Registry](https://github.com/distribution/distribution) doesn't work with multi-arch images as noted in this [bug](https://github.com/distribution/distribution/issues/3178).  The only workaround is to avoid multi-arch images completely and append the architecture name to the tag instead.
+- The `--delete-untagged` option added to [Docker Registry](https://github.com/distribution/distribution) does NOT work with multi-arch images as noted in this [bug](https://github.com/distribution/distribution/issues/3178).  The only workaround is to avoid multi-arch images completely and append the architecture name to the tag instead.
+- Do NOT use it with sigstore/cosign as they [hijack](https://github.com/sigstore/cosign#registry-api-changes) the Registry API in the most obnoxious way by storing signatures as tags, also breaking in the process every registry listing tool.
 - Only the [filesystem](https://github.com/docker/distribution/blob/master/docs/configuration.md#storage) storage driver is supported.
 
 ## Examples
