@@ -46,15 +46,6 @@ def remove_dir(path: str, dry_run: bool = False) -> None:
     logging.info("removed directory %s", path)
 
 
-def clean_revisions(repo: str, dry_run: bool = False) -> None:
-    '''Remove the revision manifests that are not present in the tags directory'''
-    revisions = set(os.listdir(f"{repo}/_manifests/revisions/sha256"))
-    manifests = set(map(os.path.basename, iglob(f"{repo}/_manifests/tags/*/*/sha256/*")))
-    revisions.difference_update(manifests)
-    for revision in revisions:
-        remove_dir(f"{repo}/_manifests/revisions/sha256/{revision}", dry_run)
-
-
 def clean_tag(repo: str, tag: str, remove: bool = False, dry_run: bool = False) -> None:
     '''Clean a specific repo:tag'''
     link = f"{repo}/_manifests/tags/{tag}/current/link"
@@ -63,14 +54,6 @@ def clean_tag(repo: str, tag: str, remove: bool = False, dry_run: bool = False) 
         return
     if remove:
         remove_dir(f"{repo}/_manifests/tags/{tag}", dry_run)
-    else:
-        with open(link, encoding="utf-8") as file:
-            current = file.read()[len("sha256:"):]
-        path = f"{repo}/_manifests/tags/{tag}/index/sha256"
-        for index in os.listdir(path):
-            if index != current:
-                remove_dir(f"{path}/{index}", dry_run)
-    clean_revisions(repo, dry_run)
 
 
 def clean_repo(image: str, remove: bool = False, dry_run: bool = False) -> None:
@@ -87,17 +70,6 @@ def clean_repo(image: str, remove: bool = False, dry_run: bool = False) -> None:
 
     if tag:
         clean_tag(repo, tag, remove, dry_run)
-        return
-
-    currents = set()
-    for link in iglob(f"{repo}/_manifests/tags/*/current/link"):
-        with open(link, encoding="utf-8") as file:
-            currents.add(file.read()[len("sha256:"):])
-    for index in iglob(f"{repo}/_manifests/tags/*/index/sha256/*"):
-        if os.path.basename(index) not in currents:
-            remove_dir(index, dry_run)
-
-    clean_revisions(repo, dry_run)
 
 
 def check_name(image: str) -> bool:
@@ -206,7 +178,7 @@ class RegistryCleaner():
 
     def garbage_collect(self, dry_run: bool = False) -> None:
         '''Runs garbage-collect'''
-        command = shlex.split("/bin/registry garbage-collect")
+        command = shlex.split("/bin/registry garbage-collect --delete-untagged")
         if dry_run:
             command.append("--dry-run")
         command.append("/etc/docker/registry/config.yml")
