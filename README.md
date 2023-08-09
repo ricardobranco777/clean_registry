@@ -54,7 +54,12 @@ docker run --rm --volumes-from registry -v /var/run/docker.sock:/var/run/docker.
 docker run --rm --volumes-from registry -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/ricardobranco777/clean_registry -x registry old_image
 ```
 
-The path to the socket can be found with:
+NOTES:
+- To directly work on a directory you can specify a null container as empty string:
+
+`docker run --rm -e REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/some/directory ghcr.io/ricardobranco777/clean_registry [--dry-run] [-x] "" [REPOSITORY[:TAG]...`
+
+- The path to the socket can be found with:
 
 `docker context inspect -f json default | jq -r '.[0].Endpoints.docker.Host'`
 
@@ -64,9 +69,11 @@ The path to the socket can be found with:
 docker run --rm --volumes-from registry -e DOCKER_HOST -e DOCKER_TLS_VERIFY=1 -v /root/.docker:/root/.docker ghcr.io/ricardobranco777/clean_registry [OPTIONS] registry [REPOSITORY[:TAG]]...
 ```
 
-Docker environment variables are documented [here](https://docs.docker.com/engine/reference/commandline/cli/#environment-variables).
+NOTES:
+- Paths other than ``/root/.docker`` path may be specified with the ``DOCKER_CERT_PATH`` environment variable.
+- Docker environment variables are documented [here](https://docs.docker.com/engine/reference/commandline/cli/#environment-variables).
 
-### Podman
+### With [Podman](https://podman.io/)
 
 ```bash
 PODMAN_SOCKET="$(podman info --format json | jq -r '.host.remoteSocket.path')"
@@ -76,7 +83,6 @@ PODMAN_SOCKET="${PODMAN_SOCKET#unix://}"
 podman run --rm --volumes-from registry -e REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/var/registry -e CONTAINER_HOST -v "$PODMAN_SOCKET:$PODMAN_SOCKET" ghcr.io/ricardobranco777/clean_registry [OPTIONS] registry [REPOSITORY[:TAG]]...
 ```
 
-Specifying `REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY` with the path used by the container registry is needed because of this [bug](https://github.com/containers/podman/issues/19529).
-
 NOTES:
+- Specifying `REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY` with the path used by the container registry is needed because of this [bug](https://github.com/containers/podman/issues/19529).
 - With rootless `podman` you can't clean up a registry container running on Docker because the socket and files are owned by root.  You can use `docker` to remove a registry in `podman` though, provided that you use the `CONTAINER_HOST` environment variable and mount the Podman socket.
