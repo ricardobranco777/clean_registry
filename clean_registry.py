@@ -83,17 +83,17 @@ class RegistryCleaner():
                 raise RuntimeError("Please run systemctl --user enable --now podman.socket")
         else:
             self.client = docker.from_env()
-
         self.container = self.client.containers.get(container) if container else None
-        self.registry_dir = self.get_registry_dir()
-        os.environ["REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"] = self.registry_dir
+        if self.container is not None:
+            # Read /etc/docker/registry/config.yml
+            self.config = yaml.full_load(self.get_file(self.container.attrs['Args'][-1]))
+        self.registry_dir = os.environ["REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"] = self.get_registry_dir()
         self._basedir = Path(f"{self.registry_dir}/docker/registry/v2/repositories")
-
         if self.container is not None:
             self.is_safe()
 
     def __call__(self, images: list[str], remove: bool = False, dry_run: bool = False) -> None:
-        with chdir(f"{self.registry_dir}/docker/registry/v2/repositories"):
+        with chdir(self._basedir):
             images = images or map(os.path.dirname, iglob("**/_manifests"))
         for image in images:
             self.clean_repo(image, remove, dry_run)
@@ -113,40 +113,25 @@ class RegistryCleaner():
         registry_dir = os.getenv("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY")
         if registry_dir:
             return registry_dir
-
         if self.container is not None:
             for env in self.container.attrs['Config']['Env']:
                 var, value = env.split("=", 1)
                 if var == "REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY":
-                    registry_dir = value
-                    break
-
-        if not registry_dir:
-            if self.container is not None:
-                config_yml = self.container.attrs['Args'][-1]
-                data = yaml.full_load(self.get_file(config_yml))
-            else:
-                with open("/etc/docker/registry/config.yml", encoding="utf-8") as file:
-                    data = yaml.full_load(file)
+                    return value
             try:
-                registry_dir = data['storage']['filesystem']['rootdirectory']
+                return self.config['storage']['filesystem']['rootdirectory']
             except KeyError as exc:
                 raise RuntimeError("Unsupported storage driver") from exc
-
         return registry_dir
-
-    def get_image_version(self) -> list[str]:
-        '''Gets the Docker distribution version running on the registry container'''
-        return self.client.containers.run(
-            self.container.attrs['Config']['Image'], command="--version", remove=True
-        ).decode('utf-8').split()
 
     def is_safe(self):
         '''
         Raises RuntimeError if the registry container is not v2.4.0+
         or is either running, not in maintenance mode and volume is mounted read-write
         '''
-        _, distribution, version = self.get_image_version()
+        distribution, version = self.client.containers.run(
+            self.container.attrs['Config']['Image'], command="--version", remove=True
+        ).decode('utf-8').split()[1:3]
         if distribution != "github.com/docker/distribution" or Version(version) < Version("v2.4.0"):
             raise RuntimeError("Registry container is not running Docker Registry 2.4.0+")
 
@@ -163,6 +148,13 @@ class RegistryCleaner():
             except (KeyError, json.JSONDecodeError) as err:
                 logging.error("REGISTRY_STORAGE_MAINTENANCE_READONLY: %s", err)
             raise RuntimeError("Registry container is not in maintenance mode")
+        try:
+            if self.config['storage']['maintenance']['readonly']['enabled']:
+                return
+            raise RuntimeError("Registry container is not in maintenance mode")
+        except KeyError:
+            pass
+
         if self.is_writable(self.registry_dir):
             raise RuntimeError("Registry container is running in production mode and volume is writable")
 
