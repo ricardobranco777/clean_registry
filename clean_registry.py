@@ -121,16 +121,17 @@ class RegistryCleaner():
         else:
             self.client = docker.from_env()
 
-        self.container = self.client.containers.get(container)
-        if self.container.attrs['State']['Running']:
-            raise RuntimeError("Please stop the container {container} before cleaning")
-
-        _, distribution, version = self.get_image_version()
-        if distribution != "github.com/docker/distribution" or Version(version) < Version("v2.4.0"):
-            raise RuntimeError("You're not running Docker Registry 2.4.0+")
-
+        self.container = self.client.containers.get(container) if container else None
         self.registry_dir = self.get_registry_dir()
         os.environ["REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"] = self.registry_dir
+
+        if self.container is not None:
+            if self.container.attrs['State']['Running'] or self.is_writable(self.registry_dir):
+                raise RuntimeError("Please stop the container {container} before cleaning")
+
+            _, distribution, version = self.get_image_version()
+            if distribution != "github.com/docker/distribution" or Version(version) < Version("v2.4.0"):
+                raise RuntimeError("You're not running Docker Registry 2.4.0+")
 
     def __call__(self, images: list[str], remove: bool = False, dry_run: bool = False) -> None:
         os.chdir(f"{self.registry_dir}/docker/registry/v2/repositories")
@@ -154,15 +155,20 @@ class RegistryCleaner():
         if registry_dir:
             return registry_dir
 
-        for env in self.container.attrs['Config']['Env']:
-            var, value = env.split("=", 1)
-            if var == "REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY":
-                registry_dir = value
-                break
+        if self.container is not None:
+            for env in self.container.attrs['Config']['Env']:
+                var, value = env.split("=", 1)
+                if var == "REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY":
+                    registry_dir = value
+                    break
 
         if not registry_dir:
-            config_yml = self.container.attrs['Args'][0]
-            data = yaml.full_load(self.get_file(config_yml))
+            if self.container is not None:
+                config_yml = self.container.attrs['Args'][0]
+                data = yaml.full_load(self.get_file(config_yml))
+            else:
+                with open("/etc/docker/registry/config.yml", encoding="utf-8") as file:
+                    data = yaml.full_load(file)
             try:
                 registry_dir = data['storage']['filesystem']['rootdirectory']
             except KeyError as exc:
@@ -171,10 +177,17 @@ class RegistryCleaner():
         return registry_dir
 
     def get_image_version(self) -> list[str]:
-        '''Gets the Docker distribution version running on the container'''
+        '''Gets the Docker distribution version running on the registry container'''
         return self.client.containers.run(
             self.container.attrs['Config']['Image'], command="--version", remove=True
         ).decode('utf-8').split()
+
+    def is_writable(self, directory: str) -> bool:
+        '''Returns True if the directory is mounted read-write on the registry container'''
+        for mount in self.container.attrs['Mounts']:
+            if mount['Destination'] == directory:
+                return mount['RW']
+        return False
 
     def garbage_collect(self, dry_run: bool = False) -> None:
         '''Runs garbage-collect'''
@@ -206,7 +219,7 @@ def parse_args():
         help="Show version and exit")
     parser.add_argument('container', nargs='?', help="Registry container")
     parser.add_argument('images', nargs='*', help="REPOSITORY:[TAG]")
-    return parser
+    return parser.parse_args()
 
 
 def print_versions():
@@ -243,14 +256,13 @@ def main():
         if path and Path(path).is_socket() and "://" not in path:
             os.environ[var] = f"unix://{path}"
 
-    parser = parse_args()
-    args = parser.parse_args()
+    args = parse_args()
     if args.version:
         print_versions()
         sys.exit(0)
-    if not args.container:
-        parser.print_usage()
-        sys.exit(1)
+
+    if not args.container and not os.getenv("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"):
+        sys.exit("ERROR: No container specified and REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY not set")
 
     for image in args.images:
         if not check_name(image):
