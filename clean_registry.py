@@ -18,7 +18,6 @@ from glob import iglob
 from io import BytesIO
 from pathlib import Path
 from shutil import rmtree
-from packaging.version import Version
 
 import docker
 from docker.errors import DockerException
@@ -58,7 +57,6 @@ def check_name(image: str) -> bool:
         re.match(r'[a-z0-9]+(?:(?:[._]|__|[-]*)[a-z0-9]+)*$', path)
         for path in repo.split("/")
     )
-
     return bool(len(image) < 256 and tag_valid and repo_valid)
 
 
@@ -126,17 +124,10 @@ class RegistryCleaner():
 
     def is_safe(self):
         '''
-        Raises RuntimeError if the registry container is not v2.4.0+ or is not running in maintenance mode
+        Raises RuntimeError if the container is running in non-maintenance mode
         '''
-        distribution, version = self.client.containers.run(
-            self.container.attrs['Config']['Image'], command="--version", remove=True
-        ).decode('utf-8').split()[1:3]
-        if distribution != "github.com/docker/distribution" or Version(version) < Version("v2.4.0"):
-            raise RuntimeError("Registry container is not running Docker Registry 2.4.0+")
-
         if not self.container.attrs['State']['Running']:
             return
-
         # Note: REGISTRY_STORAGE_MAINTENANCE_READONLY_ENABLED doesn't work because of
         # https://github.com/distribution/distribution/issues/2974
         value = os.getenv("REGISTRY_STORAGE_MAINTENANCE_READONLY")
