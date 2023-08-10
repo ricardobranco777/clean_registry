@@ -63,11 +63,11 @@ for runtime in docker podman ; do
 	"$runtime" stop "$registry"
 
 	echo -e "\nTEST: $runtime: Cleanup --dry-run\n"
-	"$runtime" run "${options[@]}" "$regclean:test" --dry-run "$registry"
+	"$runtime" run "${options[@]}" "$regclean:test" --dry-run -l debug "$registry"
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 2 ]]
 
 	echo -e "\nTEST: $runtime: Cleanup\n"
-	"$runtime" run "${options[@]}" "$regclean:test" "$registry"
+	"$runtime" run "${options[@]}" "$regclean:test" -l debug "$registry"
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 1 ]]
 
 	# Image should be pullable
@@ -76,11 +76,11 @@ for runtime in docker podman ; do
 	"$runtime" stop "$registry"
 
 	echo -e "\nTEST: $runtime: Remove image --dry-run\n"
-	"$runtime" run "${options[@]}" "$regclean:test" --dry-run -x "$registry" "${regclean##*/}"
+	"$runtime" run "${options[@]}" "$regclean:test" --dry-run -x -l debug "$registry" "${regclean##*/}"
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 1 ]]
 
 	echo -e "\nTEST: $runtime: Remove image\n"
-	"$runtime" run "${options[@]}" "$regclean:test" -x "$registry" "${regclean##*/}"
+	"$runtime" run "${options[@]}" "$regclean:test" -x -l debug "$registry" "${regclean##*/}"
 	[ ! -d "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" ]
 
 	"$runtime" rm -vf "$registry"
