@@ -120,7 +120,7 @@ class RegistryCleaner():
                 return self.config['storage']['filesystem']['rootdirectory']
             except KeyError as exc:
                 raise RuntimeError("Unsupported storage driver") from exc
-        return registry_dir
+        return "/var/lib/registry"
 
     def is_safe(self):
         '''
