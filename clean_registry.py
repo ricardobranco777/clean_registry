@@ -26,7 +26,7 @@ from podman.errors import APIError, PodmanError
 from requests.exceptions import RequestException
 import yaml
 
-VERSION = "2.9.0"
+VERSION = "2.9.1"
 
 
 def is_container() -> bool:
