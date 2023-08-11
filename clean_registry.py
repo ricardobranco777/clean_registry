@@ -82,13 +82,14 @@ class RegistryCleaner():
                     raise RuntimeError("Please run systemctl --user enable --now podman.socket")
             else:
                 self.client = docker.from_env()
-            logging.debug("runtime info: %s", self.client.info())
-            self.container = self.client.containers.get(container)
-            logging.debug("container info: %s", self.container.attrs)
-            # Read /etc/docker/registry/config.yml
-            self.config = yaml.full_load(self.get_file(self.container.attrs['Args'][-1]))
-            logging.debug("container config: %s", self.config)
-            self.check_container()
+            with closing(self.client):
+                logging.debug("runtime info: %s", self.client.info())
+                self.container = self.client.containers.get(container)
+                logging.debug("container info: %s", self.container.attrs)
+                # Read /etc/docker/registry/config.yml
+                self.config = yaml.full_load(self.get_file(self.container.attrs['Args'][-1]))
+                logging.debug("container config: %s", self.config)
+                self.check_container()
         registry_dir = os.environ["REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"] = self.get_registry_dir()
         logging.debug("registry directory: %s", registry_dir)
         self._basedir = Path(f"{registry_dir}/docker/registry/v2/repositories")
@@ -99,7 +100,6 @@ class RegistryCleaner():
         for image in images:
             self.clean_repo(image, remove, dry_run)
         self.garbage_collect(dry_run)
-        self.client.close()
 
     def get_env(self, key: str) -> str:
         '''Get environment variable from container'''
