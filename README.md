@@ -11,7 +11,7 @@ By default it performs a cleanup of untagged images with the help of the Docker 
 ## Usage
 
 ```bash
-docker run --rm --volumes-from CONTAINER [DOCKER_OPTIONS...] ghcr.io/ricardobranco777/clean_registry [OPTIONS] CONTAINER [REPOSITORY[:TAG]] ...
+docker run --rm -v REGISTRY_DIRECTORY:/var/lib/registry ghcr.io/ricardobranco777/clean_registry [OPTIONS] [REPOSITORY[:TAG]] ...
 ```
 
 ## Options
@@ -32,49 +32,22 @@ docker run --rm --volumes-from CONTAINER [DOCKER_OPTIONS...] ghcr.io/ricardobran
 
 ## Examples
 
-### With Docker
-
 ```bash
 # Run with --dry-run
-docker run --rm --volumes-from registry -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/ricardobranco777/clean_registry --dry-run registry
+docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry --dry-run
 
 # Cleanup of untagged images
-docker run --rm --volumes-from registry -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/ricardobranco777/clean_registry registry
+docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry registry
 
 # Test remove tagged image with --dry-run
-docker run --rm --volumes-from registry -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/ricardobranco777/clean_registry --dry-run -x registry old_image:latest
+docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry --dry-run -x old_image:latest
 
 # Remove tagged image
-docker run --rm --volumes-from registry -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/ricardobranco777/clean_registry -x registry old_image:latest
+docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry -x old_image:latest
 
 # Test remove whole repo (all tags) with --dry-run
-docker run --rm --volumes-from registry -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/ricardobranco777/clean_registry --dry-run -x registry old_image
+docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry --dry-run -x old_image
 
 # Remove whole repo (all tags)
-docker run --rm --volumes-from registry -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/ricardobranco777/clean_registry -x registry old_image
+docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry -x old_image
 ```
-
-NOTES:
-- To directly work on a directory you can specify a null container as empty string:
-```bash
-docker run --rm -e REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/some/directory ghcr.io/ricardobranco777/clean_registry [--dry-run] [-x] "" [REPOSITORY[:TAG]...
-```
-
-- The path to the socket can be found with:
-```bash
-docker context inspect -f json default | jq -r '.[0].Endpoints.docker.Host'`
-```
-
-### With [Podman](https://podman.io/)
-
-```bash
-PODMAN_SOCKET="$(podman info --format json | jq -r '.host.remoteSocket.path')"
-export CONTAINER_HOST="$PODMAN_SOCKET"
-PODMAN_SOCKET="${PODMAN_SOCKET#unix://}"
-
-podman run --rm --volumes-from registry -e REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/var/registry -e CONTAINER_HOST -v "$PODMAN_SOCKET:$PODMAN_SOCKET" ghcr.io/ricardobranco777/clean_registry [OPTIONS] registry [REPOSITORY[:TAG]]...
-```
-
-NOTES:
-- Specifying `REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY` with the path used by the container registry is needed because of this [bug](https://github.com/containers/podman/issues/19529).
-- With rootless `podman` you can't clean up a registry container running on Docker because the socket and files are owned by root.  You can use `docker` to remove a registry in `podman` though, provided that you use the `CONTAINER_HOST` environment variable and mount the Podman socket.

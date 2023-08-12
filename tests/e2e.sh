@@ -32,19 +32,11 @@ podman save "$scratch" | docker load
 podman build -t "$regclean:test" --pull .
 podman save "$regclean:test" | docker load
 
-DOCKER_HOST="$(docker context inspect -f json default | jq -r '.[0].Endpoints.docker.Host')"
-DOCKER_SOCKET="${DOCKER_HOST#unix://}"
-PODMAN_SOCKET="$(podman info --format json | jq -r '.host.remoteSocket.path')"
-CONTAINER_HOST="$PODMAN_SOCKET"
-PODMAN_SOCKET="${PODMAN_SOCKET#unix://}"
-
 for runtime in docker podman ; do
-	options=(--rm --volumes-from "$registry")
+	options=(--rm --volumes-from "$registry" -v "$directory:/var/lib/registry")
 	if [[ $runtime = podman ]] ; then
-		options+=(-e CONTAINER_HOST="$CONTAINER_HOST" -v "$PODMAN_SOCKET:$PODMAN_SOCKET")
 		runtime_options=(--tls-verify=false)
 	else
-		options+=(-e DOCKER_HOST="$DOCKER_HOST" -v "$DOCKER_SOCKET:$DOCKER_SOCKET")
 		runtime_options=()
 	fi
 
@@ -63,11 +55,11 @@ for runtime in docker podman ; do
 	"$runtime" stop "$registry"
 
 	echo -e "\nTEST: $runtime: Cleanup --dry-run\n"
-	"$runtime" run "${options[@]}" "$regclean:test" --dry-run -l debug "$registry"
+	"$runtime" run "${options[@]}" "$regclean:test" --dry-run -l debug
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 2 ]]
 
 	echo -e "\nTEST: $runtime: Cleanup\n"
-	"$runtime" run "${options[@]}" "$regclean:test" -l debug "$registry"
+	"$runtime" run "${options[@]}" "$regclean:test" -l debug
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 1 ]]
 
 	# Image should be pullable
@@ -76,11 +68,11 @@ for runtime in docker podman ; do
 	"$runtime" stop "$registry"
 
 	echo -e "\nTEST: $runtime: Remove image --dry-run\n"
-	"$runtime" run "${options[@]}" "$regclean:test" --dry-run -x -l debug "$registry" "${regclean##*/}"
+	"$runtime" run "${options[@]}" "$regclean:test" --dry-run -x -l debug "${regclean##*/}"
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 1 ]]
 
 	echo -e "\nTEST: $runtime: Remove image\n"
-	"$runtime" run "${options[@]}" "$regclean:test" -x -l debug "$registry" "${regclean##*/}"
+	"$runtime" run "${options[@]}" "$regclean:test" -x -l debug "${regclean##*/}"
 	[ ! -d "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" ]
 
 	"$runtime" rm -vf "$registry"

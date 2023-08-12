@@ -3,28 +3,19 @@
 Docker Registry cleaner
 """
 
-import json
 import logging
 import os
 import re
 import shlex
 import sys
-import tarfile
 import subprocess
 
 from argparse import ArgumentParser
-from contextlib import chdir, closing
+from contextlib import chdir
 from glob import iglob
-from io import BytesIO
 from pathlib import Path
 from shutil import rmtree
 
-import docker
-from docker.errors import DockerException
-import podman
-from podman.errors import APIError, PodmanError
-from requests.exceptions import RequestException
-import yaml
 
 VERSION = "2.9.1"
 
@@ -74,23 +65,8 @@ def run_command(command: list) -> int:
 
 class RegistryCleaner():
     '''Simple callable class for Docker Registry cleaning duties'''
-    def __init__(self, container: str):
-        if container:
-            if os.getenv("CONTAINER_HOST"):
-                self.client = podman.from_env()
-                if not self.client.info()['host']['remoteSocket']["exists"]:
-                    raise RuntimeError("Please run systemctl --user enable --now podman.socket")
-            else:
-                self.client = docker.from_env()
-            with closing(self.client):
-                logging.debug("runtime info: %s", self.client.info())
-                self.container = self.client.containers.get(container)
-                logging.debug("container info: %s", self.container.attrs)
-                # Read /etc/docker/registry/config.yml
-                self.config = yaml.full_load(self.get_file(self.container.attrs['Args'][-1]))
-                logging.debug("container config: %s", self.config)
-                self.check_container()
-        registry_dir = os.environ["REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"] = self.get_registry_dir()
+    def __init__(self):
+        registry_dir = os.environ.get("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY", "/var/lib/registry")
         logging.debug("registry directory: %s", registry_dir)
         self._basedir = Path(f"{registry_dir}/docker/registry/v2/repositories")
 
@@ -100,60 +76,6 @@ class RegistryCleaner():
         for image in images:
             self.clean_repo(image, remove, dry_run)
         self.garbage_collect(dry_run)
-
-    def get_env(self, key: str) -> str:
-        '''Get environment variable from container'''
-        for env in self.container.attrs['Config']['Env']:
-            var, value = env.split("=", 1)
-            if var == key:
-                return value
-        return None
-
-    def get_file(self, path: str) -> bytes:
-        '''Returns the contents of the specified file from the container'''
-        with BytesIO(b"".join(_ for _ in self.container.get_archive(path)[0])) as stream:
-            with tarfile.open(fileobj=stream) as tar:
-                with tar.extractfile(os.path.basename(path)) as file:
-                    data = file.read()
-        return data
-
-    def get_registry_dir(self) -> str:
-        '''Gets the Registry directory'''
-        registry_dir = os.getenv("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY")
-        if registry_dir:
-            return registry_dir
-        if self.container is not None:
-            registry_dir = self.get_env("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY")
-            if registry_dir:
-                return registry_dir
-            try:
-                return self.config['storage']['filesystem']['rootdirectory']
-            except KeyError as exc:
-                raise RuntimeError("Unsupported storage driver") from exc
-        return "/var/lib/registry"
-
-    def check_container(self):
-        '''
-        Raises RuntimeError if the container is running in non-maintenance mode
-        '''
-        if not self.container.attrs['State']['Running']:
-            return
-        # Note: REGISTRY_STORAGE_MAINTENANCE_READONLY_ENABLED doesn't work because of
-        # https://github.com/distribution/distribution/issues/2974
-        value = self.get_env("REGISTRY_STORAGE_MAINTENANCE_READONLY")
-        if value:
-            try:
-                if json.loads(value)["enabled"] is True:
-                    return
-            except (KeyError, json.JSONDecodeError) as err:
-                logging.error("REGISTRY_STORAGE_MAINTENANCE_READONLY: %s", err)
-        else:
-            try:
-                if self.config['storage']['maintenance']['readonly']['enabled']:
-                    return
-            except KeyError:
-                pass
-        raise RuntimeError("Registry container is not in maintenance mode")
 
     def garbage_collect(self, dry_run: bool = False) -> None:
         '''Runs garbage-collect'''
@@ -215,7 +137,6 @@ def parse_args():
     parser.add_argument(
         '-V', '--version', action='store_true',
         help="Show version and exit")
-    parser.add_argument('container', nargs='?', help="Registry container")
     parser.add_argument('images', nargs='*', help="REPOSITORY:[TAG]")
     return parser.parse_args()
 
@@ -228,20 +149,6 @@ def print_versions():
     with open("/etc/os-release", encoding="utf-8") as file:
         osrel = {k: v.strip('"') for k, v in [line.split('=') for line in file.read().splitlines()]}
     print(osrel['NAME'], osrel['VERSION_ID'])
-    try:
-        client = docker.from_env()
-        print(f"docker-py {docker.version.__version__}")
-        with closing(client):
-            print(client.version())
-    except (RequestException, DockerException):
-        pass
-    try:
-        client = podman.from_env()
-        print(f"podman-py {podman.version.__version__}")
-        with closing(client):
-            print(client.version())
-    except (ValueError, APIError, PodmanError):
-        pass
 
 
 def main():
@@ -249,18 +156,10 @@ def main():
     if not is_container() or not os.path.isfile("/bin/registry"):
         sys.exit("ERROR: This script should run inside a registry:2 container!")
 
-    for var in ('CONTAINER_HOST', 'DOCKER_HOST'):
-        path = os.getenv(var)
-        if path and Path(path).is_socket() and "://" not in path:
-            os.environ[var] = f"unix://{path}"
-
     args = parse_args()
     if args.version:
         print_versions()
         sys.exit(0)
-
-    if not args.container and not os.getenv("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY"):
-        sys.exit("ERROR: No container specified and REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY not set")
 
     for image in args.images:
         if not check_name(image):
@@ -272,9 +171,7 @@ def main():
     fmt = "%(asctime)s %(levelname)-8s %(message)s"
     logging.basicConfig(format=fmt, stream=sys.stderr, level=args.log.upper())
 
-    RegistryCleaner(
-        container=args.container,
-    )(
+    RegistryCleaner()(
         images=args.images,
         remove=args.remove,
         dry_run=args.dry_run,

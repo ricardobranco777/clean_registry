@@ -1,3 +1,0 @@
-docker[ssh]
-podman
-PyYAML
