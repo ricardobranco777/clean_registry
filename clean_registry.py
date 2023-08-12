@@ -17,7 +17,7 @@ from pathlib import Path
 from shutil import rmtree
 
 
-VERSION = "2.9.1"
+VERSION = "3.0"
 
 
 def is_container() -> bool:
