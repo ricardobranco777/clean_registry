@@ -32,7 +32,7 @@ docker run --rm --volumes-from CONTAINER [DOCKER_OPTIONS...] ghcr.io/ricardobran
 
 ## Examples
 
-### With local Docker setup
+### With Docker
 
 ```bash
 # Run with --dry-run
@@ -64,16 +64,6 @@ docker run --rm -e REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/some/directory ghc
 ```bash
 docker context inspect -f json default | jq -r '.[0].Endpoints.docker.Host'`
 ```
-
-### With [remote Docker setup](https://docs.docker.com/engine/security/protect-access/)
-
-```bash
-docker run --rm --volumes-from registry -e DOCKER_HOST -e DOCKER_TLS_VERIFY=1 -v /root/.docker:/root/.docker ghcr.io/ricardobranco777/clean_registry [OPTIONS] registry [REPOSITORY[:TAG]]...
-```
-
-NOTES:
-- Paths other than ``/root/.docker`` path may be specified with the ``DOCKER_CERT_PATH`` environment variable.
-- Docker environment variables are documented [here](https://docs.docker.com/engine/reference/commandline/cli/#environment-variables).
 
 ### With [Podman](https://podman.io/)
 
