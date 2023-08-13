@@ -61,59 +61,60 @@ def run_command(command: list) -> int:
         return proc.wait()
 
 
-class RegistryCleaner():
-    '''Simple callable class for Docker Registry cleaning duties'''
-    def __init__(self):
-        registry_dir = os.environ.get("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY", "/var/lib/registry")
-        logging.debug("registry directory: %s", registry_dir)
-        self._basedir = Path(f"{registry_dir}/docker/registry/v2/repositories")
+def clean_registry(images: list[str], dry_run: bool = False) -> None:
+    '''Clean registry'''
+    registry_dir = os.environ.get("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY", "/var/lib/registry")
+    logging.debug("registry directory: %s", registry_dir)
+    basedir = Path(f"{registry_dir}/docker/registry/v2/repositories")
+    for image in images:
+        clean_repo(basedir, image, dry_run)
+    garbage_collect(dry_run)
 
-    def __call__(self, images: list[str], dry_run: bool = False) -> None:
-        for image in images:
-            self.clean_repo(image, dry_run)
-        self.garbage_collect(dry_run)
 
-    def garbage_collect(self, dry_run: bool = False) -> None:
-        '''Runs garbage-collect'''
-        command = shlex.split("/bin/registry garbage-collect --delete-untagged")
-        if dry_run:
-            command.append("--dry-run")
-        command.append("/etc/docker/registry/config.yml")
-        logging.debug("Running %s", shlex.join(command))
-        status = run_command(command)
-        if status != 0:
-            logging.error("Command returned %d", status)
+def garbage_collect(dry_run: bool = False) -> None:
+    '''Runs garbage-collect'''
+    command = shlex.split("/bin/registry garbage-collect --delete-untagged")
+    if dry_run:
+        command.append("--dry-run")
+    command.append("/etc/docker/registry/config.yml")
+    logging.debug("Running %s", shlex.join(command))
+    status = run_command(command)
+    if status != 0:
+        logging.error("Command returned %d", status)
 
-    def remove_dir(self, path: str, dry_run: bool = False) -> None:
-        '''Run rmtree() in verbose mode'''
-        if dry_run:
-            logging.info("directory %s skipped due to dry-run", path)
-            return
-        rmtree(self._basedir / path)
-        logging.info("removed directory %s", path)
 
-    def clean_tag(self, repo: str, tag: str, dry_run: bool = False) -> None:
-        '''Clean a specific repo:tag'''
-        link = self._basedir / f"{repo}/_manifests/tags/{tag}/current/link"
-        if not link.is_file():
-            logging.error("No such tag: %s in repository %s", tag, repo)
-            return
-        self.remove_dir(f"{repo}/_manifests/tags/{tag}", dry_run)
+def remove_dir(basedir: Path, path: str, dry_run: bool = False) -> None:
+    '''Run rmtree() in verbose mode'''
+    if dry_run:
+        logging.info("directory %s skipped due to dry-run", path)
+        return
+    rmtree(basedir / path)
+    logging.info("removed directory %s", path)
 
-    def clean_repo(self, image: str, dry_run: bool = False) -> None:
-        '''Clean all tags (or a specific one, if specified) from a specific repository'''
-        repo, tag = image.split(":", 1) if ":" in image else (image, "")
-        repodir = self._basedir / repo
-        if not repodir.is_dir():
-            logging.error("No such repository: %s", repo)
-            return
-        # Remove repo if there's only one tag
-        tagsdir = self._basedir / f"{repo}/_manifests/tags"
-        if not tag or [tag] == list(tagsdir.iterdir()):
-            self.remove_dir(repo, dry_run)
-            return
-        if tag:
-            self.clean_tag(repo, tag, dry_run)
+
+def clean_tag(basedir: Path, repo: str, tag: str, dry_run: bool = False) -> None:
+    '''Clean a specific repo:tag'''
+    link = basedir / f"{repo}/_manifests/tags/{tag}/current/link"
+    if not link.is_file():
+        logging.error("No such tag: %s in repository %s", tag, repo)
+        return
+    remove_dir(basedir, f"{repo}/_manifests/tags/{tag}", dry_run)
+
+
+def clean_repo(basedir: Path, image: str, dry_run: bool = False) -> None:
+    '''Clean all tags (or a specific one, if specified) from a specific repository'''
+    repo, tag = image.split(":", 1) if ":" in image else (image, "")
+    repodir = basedir / repo
+    if not repodir.is_dir():
+        logging.error("No such repository: %s", repo)
+        return
+    # Remove repo if there's only one tag
+    tagsdir = basedir / f"{repo}/_manifests/tags"
+    if not tag or [tag] == list(tagsdir.iterdir()):
+        remove_dir(basedir, repo, dry_run)
+        return
+    if tag:
+        clean_tag(basedir, repo, tag, dry_run)
 
 
 def parse_args():
@@ -160,10 +161,7 @@ def main():
     fmt = "%(asctime)s %(levelname)-8s %(message)s"
     logging.basicConfig(format=fmt, stream=sys.stderr, level=args.log.upper())
 
-    RegistryCleaner()(
-        images=args.images,
-        dry_run=args.dry_run,
-    )
+    clean_registry(images=args.images, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
