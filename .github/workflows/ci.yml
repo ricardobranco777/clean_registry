@@ -28,6 +28,9 @@ jobs:
       - name: pytest
         run: |
           make pytest
+      - name: mypy
+        run: |
+          make mypy
   e2e:
     runs-on: ubuntu-latest
     steps:
