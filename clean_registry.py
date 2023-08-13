@@ -14,7 +14,7 @@ from argparse import ArgumentParser
 from shutil import rmtree
 
 
-VERSION = "3.0"
+VERSION = "3.1"
 
 
 def is_container() -> bool:
