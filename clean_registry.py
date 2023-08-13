@@ -11,7 +11,6 @@ import sys
 import subprocess
 
 from argparse import ArgumentParser
-from pathlib import Path
 from shutil import rmtree
 
 
@@ -56,8 +55,9 @@ def run_command(command: list) -> int:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT
     ) as proc:
-        for line in proc.stdout:
-            logging.info(line.decode('utf-8').rstrip())
+        if proc.stdout is not None:
+            for line in proc.stdout:
+                logging.info(line.decode('utf-8').rstrip())
         return proc.wait()
 
 
@@ -65,7 +65,7 @@ def clean_registry(images: list[str], dry_run: bool = False) -> None:
     '''Clean registry'''
     registry_dir = os.environ.get("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY", "/var/lib/registry")
     logging.debug("registry directory: %s", registry_dir)
-    basedir = Path(f"{registry_dir}/docker/registry/v2/repositories")
+    basedir = f"{registry_dir}/docker/registry/v2/repositories"
     for image in images:
         clean_repo(basedir, image, dry_run)
     garbage_collect(dry_run)
@@ -83,35 +83,32 @@ def garbage_collect(dry_run: bool = False) -> None:
         logging.error("Command returned %d", status)
 
 
-def remove_dir(basedir: Path, path: str, dry_run: bool = False) -> None:
+def remove_dir(directory: str, dry_run: bool = False) -> None:
     '''Run rmtree() in verbose mode'''
     if dry_run:
-        logging.info("directory %s skipped due to dry-run", path)
+        logging.info("directory %s skipped due to dry-run", directory)
         return
-    rmtree(basedir / path)
-    logging.info("removed directory %s", path)
+    rmtree(directory)
+    logging.info("removed directory %s", directory)
 
 
-def clean_tag(basedir: Path, repo: str, tag: str, dry_run: bool = False) -> None:
+def clean_tag(basedir: str, repo: str, tag: str, dry_run: bool = False) -> None:
     '''Clean a specific repo:tag'''
-    link = basedir / f"{repo}/_manifests/tags/{tag}/current/link"
-    if not link.is_file():
+    if not os.path.isfile(f"{basedir}/{repo}/_manifests/tags/{tag}/current/link"):
         logging.error("No such tag: %s in repository %s", tag, repo)
         return
-    remove_dir(basedir, f"{repo}/_manifests/tags/{tag}", dry_run)
+    remove_dir(f"{basedir}/{repo}/_manifests/tags/{tag}", dry_run)
 
 
-def clean_repo(basedir: Path, image: str, dry_run: bool = False) -> None:
+def clean_repo(basedir: str, image: str, dry_run: bool = False) -> None:
     '''Clean all tags (or a specific one, if specified) from a specific repository'''
     repo, tag = image.split(":", 1) if ":" in image else (image, "")
-    repodir = basedir / repo
-    if not repodir.is_dir():
+    if not os.path.isdir(f"{basedir}/{repo}"):
         logging.error("No such repository: %s", repo)
         return
     # Remove repo if there's only one tag
-    tagsdir = basedir / f"{repo}/_manifests/tags"
-    if not tag or [tag] == list(tagsdir.iterdir()):
-        remove_dir(basedir, repo, dry_run)
+    if not tag or [tag] == os.listdir(f"{basedir}/{repo}/_manifests/tags"):
+        remove_dir(f"{basedir}/{repo}", dry_run)
         return
     if tag:
         clean_tag(basedir, repo, tag, dry_run)
