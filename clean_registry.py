@@ -11,8 +11,6 @@ import sys
 import subprocess
 
 from argparse import ArgumentParser
-from contextlib import chdir
-from glob import iglob
 from pathlib import Path
 from shutil import rmtree
 
@@ -70,11 +68,9 @@ class RegistryCleaner():
         logging.debug("registry directory: %s", registry_dir)
         self._basedir = Path(f"{registry_dir}/docker/registry/v2/repositories")
 
-    def __call__(self, images: list[str], remove: bool = False, dry_run: bool = False) -> None:
-        with chdir(self._basedir):
-            images = images or map(os.path.dirname, iglob("**/_manifests"))
+    def __call__(self, images: list[str], dry_run: bool = False) -> None:
         for image in images:
-            self.clean_repo(image, remove, dry_run)
+            self.clean_repo(image, dry_run)
         self.garbage_collect(dry_run)
 
     def garbage_collect(self, dry_run: bool = False) -> None:
@@ -96,16 +92,15 @@ class RegistryCleaner():
         rmtree(self._basedir / path)
         logging.info("removed directory %s", path)
 
-    def clean_tag(self, repo: str, tag: str, remove: bool = False, dry_run: bool = False) -> None:
+    def clean_tag(self, repo: str, tag: str, dry_run: bool = False) -> None:
         '''Clean a specific repo:tag'''
         link = self._basedir / f"{repo}/_manifests/tags/{tag}/current/link"
         if not link.is_file():
             logging.error("No such tag: %s in repository %s", tag, repo)
             return
-        if remove:
-            self.remove_dir(f"{repo}/_manifests/tags/{tag}", dry_run)
+        self.remove_dir(f"{repo}/_manifests/tags/{tag}", dry_run)
 
-    def clean_repo(self, image: str, remove: bool = False, dry_run: bool = False) -> None:
+    def clean_repo(self, image: str, dry_run: bool = False) -> None:
         '''Clean all tags (or a specific one, if specified) from a specific repository'''
         repo, tag = image.split(":", 1) if ":" in image else (image, "")
         repodir = self._basedir / repo
@@ -114,11 +109,11 @@ class RegistryCleaner():
             return
         # Remove repo if there's only one tag
         tagsdir = self._basedir / f"{repo}/_manifests/tags"
-        if remove and (not tag or [tag] == list(tagsdir.iterdir())):
+        if not tag or [tag] == list(tagsdir.iterdir()):
             self.remove_dir(repo, dry_run)
             return
         if tag:
-            self.clean_tag(repo, tag, remove, dry_run)
+            self.clean_tag(repo, tag, dry_run)
 
 
 def parse_args():
@@ -131,9 +126,6 @@ def parse_args():
         '-l', '--log', default='info',
         choices='debug info warning error critical'.split(),
         help="Log level (default is info)")
-    parser.add_argument(
-        '-x', '--remove', action='store_true',
-        help="Remove the specified images or repositories")
     parser.add_argument(
         '-V', '--version', action='store_true',
         help="Show version and exit")
@@ -165,15 +157,11 @@ def main():
         if not check_name(image):
             sys.exit(f"ERROR: Invalid Docker repository/tag: {image}")
 
-    if args.remove and not args.images:
-        sys.exit("ERROR: The -x option requires that you specify at least one repository...")
-
     fmt = "%(asctime)s %(levelname)-8s %(message)s"
     logging.basicConfig(format=fmt, stream=sys.stderr, level=args.log.upper())
 
     RegistryCleaner()(
         images=args.images,
-        remove=args.remove,
         dry_run=args.dry_run,
     )
 

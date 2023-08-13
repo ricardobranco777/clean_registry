@@ -68,11 +68,11 @@ for runtime in docker podman ; do
 	"$runtime" stop "$registry"
 
 	echo -e "\nTEST: $runtime: Remove image --dry-run\n"
-	"$runtime" run "${options[@]}" "$regclean:test" --dry-run -x -l debug "${regclean##*/}"
+	"$runtime" run "${options[@]}" "$regclean:test" --dry-run -l debug "${regclean##*/}"
 	[[ $(find "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" -type f | wc -l) -eq 1 ]]
 
 	echo -e "\nTEST: $runtime: Remove image\n"
-	"$runtime" run "${options[@]}" "$regclean:test" -x -l debug "${regclean##*/}"
+	"$runtime" run "${options[@]}" "$regclean:test" -l debug "${regclean##*/}"
 	[ ! -d "$directory/docker/registry/v2/repositories/clean_registry/_manifests/revisions/sha256" ]
 
 	"$runtime" rm -vf "$registry"

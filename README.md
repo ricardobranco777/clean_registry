@@ -6,7 +6,7 @@ Docker Registry cleanup and image removal tool.
 
 Docker image for `linux/amd64` available at `ghcr.io/ricardobranco777/clean_registry:latest`
 
-By default it performs a cleanup of untagged images with the help of the Docker Registry garbage collector.  The optional `-x` flag may be used to remove the specified repositories or tagged images.
+By default it performs a cleanup of untagged images with the help of the Docker Registry garbage collector or remove the specified repositories or tagged images.
 
 ## Usage
 
@@ -20,7 +20,6 @@ docker run --rm -v REGISTRY_DIRECTORY:/var/lib/registry ghcr.io/ricardobranco777
   --dry-run      Don't remove anything
   -l {debug,info,warning,error,critical}, --log {debug,info,warning,error,critical}
                  Log level (default is info)
-  -x, --remove   Remove the specified images or repositories
   -V, --version  Show version and exit
 ```
 
@@ -40,14 +39,14 @@ docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/
 docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry registry
 
 # Test remove tagged image with --dry-run
-docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry --dry-run -x old_image:latest
+docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry --dry-run old_image:latest
 
 # Remove tagged image
-docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry -x old_image:latest
+docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry old_image:latest
 
 # Test remove whole repo (all tags) with --dry-run
-docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry --dry-run -x old_image
+docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry --dry-run old_image
 
 # Remove whole repo (all tags)
-docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry -x old_image
+docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry old_image
 ```
