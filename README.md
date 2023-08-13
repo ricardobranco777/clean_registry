@@ -29,16 +29,16 @@ docker run --rm -v REGISTRY_DIRECTORY:/var/lib/registry ghcr.io/ricardobranco777
 
 - The `--delete-untagged` option added to [Docker Registry](https://github.com/distribution/distribution) does NOT work with multi-arch images as noted in this [bug](https://github.com/distribution/distribution/issues/3178).  The only workaround is to avoid multi-arch images completely and append the architecture name to the tag instead.
 - Do NOT use it with sigstore/cosign as they [hijack](https://github.com/sigstore/cosign#registry-api-changes) the Registry API in the most obnoxious way by storing signatures as tags, also breaking in the process every registry listing tool.
-- Only the [filesystem](https://github.com/docker/distribution/blob/master/docs/configuration.md#storage) storage driver is supported.
+- It should work with `--volumes-from REGISTRY_CONTAINER` if the volume is mounted in `/var/lib/registry`.  Beware that this option may be [buggy in Podman](https://github.com/containers/podman/issues/19529).
 
 ## Examples
 
 ```bash
-# Run with --dry-run
+# Test cleanup with --dry-run
 docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry --dry-run
 
 # Cleanup of untagged images
-docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry registry
+docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry
 
 # Test remove tagged image with --dry-run
 docker run --rm -v /path/to/registry:/var/lib/registry ghcr.io/ricardobranco777/clean_registry --dry-run old_image:latest
