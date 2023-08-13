@@ -1,5 +1,7 @@
 ![Build Status](https://github.com/ricardobranco777/clean_registry/actions/workflows/ci.yml/badge.svg)
 
+[![codecov](https://codecov.io/gh/ricardobranco777/clean_registry/branch/master/graph/badge.svg)](https://codecov.io/gh/ricardobranco777/clean_registry)
+
 # clean_registry
 
 Docker Registry cleanup and image removal tool.

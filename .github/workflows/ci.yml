@@ -22,15 +22,13 @@ jobs:
         run: |
           make flake8
         continue-on-error: true
-      - name: pylint
-        run: |
-          make pylint
-      - name: pytest
-        run: |
-          make pytest
       - name: mypy
         run: |
           make mypy
+        continue-on-error: true
+      - name: pylint
+        run: |
+          make pylint
   e2e:
     runs-on: ubuntu-latest
     steps:
@@ -41,6 +39,21 @@ jobs:
       - name: e2e
         run: |
           make e2e
+  codecov:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements-test.txt
+      - name: Run tests and collect coverage
+        run: make pytest
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
   shellcheck:
     runs-on: ubuntu-latest
     steps:

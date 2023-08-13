@@ -61,7 +61,7 @@ def run_command(command: list) -> int:
         return proc.wait()
 
 
-def clean_registry(images: list[str], dry_run: bool = False) -> None:
+def clean_registrydir(images: list[str], dry_run: bool = False) -> None:
     '''Clean registry'''
     registry_dir = os.environ.get("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY", "/var/lib/registry")
     logging.debug("registry directory: %s", registry_dir)
@@ -114,7 +114,13 @@ def clean_repo(basedir: str, image: str, dry_run: bool = False) -> None:
         clean_tag(basedir, repo, tag, dry_run)
 
 
-def parse_args():
+def get_os_release():
+    '''Get OS release'''
+    with open("/etc/os-release", encoding="utf-8") as file:
+        return {k: v.strip('"') for k, v in [line.split('=') for line in file.read().splitlines()]}
+
+
+def parse_args():  # pragma: no cover
     """Parse args"""
     parser = ArgumentParser()
     parser.add_argument(
@@ -131,16 +137,6 @@ def parse_args():
     return parser.parse_args()
 
 
-def print_versions():
-    '''Print useful information for debugging'''
-    print(f'{os.path.basename(sys.argv[0])} {VERSION}')
-    print(f'Python {sys.version}')
-    print(subprocess.check_output(shlex.split("/bin/registry --version")).decode("utf-8").strip())
-    with open("/etc/os-release", encoding="utf-8") as file:
-        osrel = {k: v.strip('"') for k, v in [line.split('=') for line in file.read().splitlines()]}
-    print(osrel['NAME'], osrel['VERSION_ID'])
-
-
 def main():
     '''Main function'''
     if not is_container() or not os.path.isfile("/bin/registry"):
@@ -148,7 +144,11 @@ def main():
 
     args = parse_args()
     if args.version:
-        print_versions()
+        print(f'{os.path.basename(sys.argv[0])} {VERSION}')
+        print(f'Python {sys.version}')
+        print(subprocess.check_output(shlex.split("/bin/registry --version")).decode("utf-8").strip())
+        osrel = get_os_release()
+        print(osrel['NAME'], osrel['VERSION_ID'])
         sys.exit(0)
 
     for image in args.images:
@@ -158,7 +158,7 @@ def main():
     fmt = "%(asctime)s %(levelname)-8s %(message)s"
     logging.basicConfig(format=fmt, stream=sys.stderr, level=args.log.upper())
 
-    clean_registry(images=args.images, dry_run=args.dry_run)
+    clean_registrydir(images=args.images, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-FILES=*.py
+FILES=*.py tests/*.py
 
 .PHONY: all
 all: flake8 pylint pytest mypy
@@ -13,11 +13,11 @@ pylint:
 
 .PHONY: pytest
 pytest:
-	@pytest -v
+	@pytest --capture=sys -v --cov --cov-report term-missing
 
 .PHONY: mypy
 mypy:
-	@mypy .
+	@mypy $(FILES)
 
 .PHONY: e2e
 e2e:
