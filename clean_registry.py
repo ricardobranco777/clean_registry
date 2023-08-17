@@ -50,15 +50,23 @@ def check_name(image: str) -> bool:
 
 def run_command(command: list) -> int:
     '''Run command'''
-    with subprocess.Popen(
+    logging.info("Running %s", shlex.join(command))
+    try:
+        with subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT
-    ) as proc:
-        if proc.stdout is not None:
-            for line in proc.stdout:
-                logging.info(line.decode('utf-8').rstrip())
-        return proc.wait()
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            bufsize=1,  # Line-buffered
+            shell=False,
+        ) as process:
+            if process.stdout is not None:
+                for line in process.stdout:
+                    logging.info(line.rstrip())
+        return process.returncode
+    except OSError as exc:
+        logging.error("%s", exc)
+    return 1
 
 
 def clean_registrydir(images: list[str], dry_run: bool = False) -> None:

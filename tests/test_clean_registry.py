@@ -2,7 +2,6 @@
 
 import logging
 import shlex
-import subprocess
 import pytest
 from clean_registry import check_name, is_container, run_command, clean_registrydir, clean_tag, clean_repo, remove_dir, garbage_collect, get_os_release, main
 
@@ -136,30 +135,57 @@ def test_is_container(test_case, monkeypatch):
     assert is_container() == test_case['expected_result']
 
 
-class MockPopen:
-    def __init__(self, *args, **kwargs):
-        pass
+def test_run_command_success(mocker, caplog):
+    caplog.set_level(logging.INFO)
+    process_mock = mocker.MagicMock()
+    process_mock.__enter__.return_value.stdout = ['stdout_line1\n', 'stdout_line2\n']
+    process_mock.__enter__.return_value.returncode = 0
 
-    def __enter__(self):
-        return self
+    mocker.patch('subprocess.Popen', return_value=process_mock)
 
-    def __exit__(self, *args, **kwargs):
-        pass
+    exit_code = run_command(['some_command'])
+    assert exit_code == 0
 
-    def wait(self):
-        return 0
-
-    @property
-    def stdout(self):
-        return [b'Output Line 1\n', b'Output Line 2\n']
+    assert 'stdout_line1' in caplog.text
 
 
-def test_run_command(monkeypatch):
-    monkeypatch.setattr(subprocess, 'Popen', MockPopen)
-    command = ['dummy']
-    result = run_command(command)
+def test_run_command_failure(mocker, caplog):
+    caplog.set_level(logging.INFO)
+    process_mock = mocker.MagicMock()
+    process_mock.__enter__.return_value.stdout = ['stderr_line1\n', 'stderr_line2\n']
+    process_mock.__enter__.return_value.returncode = 1
 
-    assert result == 0
+    mocker.patch('subprocess.Popen', return_value=process_mock)
+
+    exit_code = run_command(['some_command'])
+    assert exit_code == 1
+
+    assert 'stderr_line1' in caplog.text
+
+
+def test_run_command_no_output(mocker, caplog):
+    caplog.set_level(logging.INFO)
+    process_mock = mocker.MagicMock()
+    process_mock.__enter__.return_value.stdout = []
+    process_mock.__enter__.return_value.returncode = 0
+
+    mocker.patch('subprocess.Popen', return_value=process_mock)
+
+    exit_code = run_command(['some_command'])
+    assert exit_code == 0
+
+    assert "Running some_command" in caplog.text
+
+
+def test_run_command_error(mocker, caplog):
+    caplog.set_level(logging.INFO)
+    process_mock = mocker.MagicMock()
+    process_mock.__enter__.side_effect = OSError(2, 'some_command')
+
+    mocker.patch('subprocess.Popen', return_value=process_mock)
+
+    exit_code = run_command(['some_command'])
+    assert exit_code == 1
 
 
 @pytest.fixture
