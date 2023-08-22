@@ -3,6 +3,7 @@
 Docker Registry cleaner
 """
 
+import argparse
 import logging
 import os
 import re
@@ -10,7 +11,6 @@ import shlex
 import sys
 import subprocess
 
-from argparse import ArgumentParser
 from shutil import rmtree
 
 
@@ -48,7 +48,7 @@ def check_name(image: str) -> bool:
     return bool(len(image) < 256 and tag_valid and repo_valid)
 
 
-def run_command(command: list) -> int:
+def run_command(command: list[str]) -> int:
     '''Run command'''
     logging.info("Running %s", shlex.join(command))
     try:
@@ -122,15 +122,15 @@ def clean_repo(basedir: str, image: str, dry_run: bool = False) -> None:
         clean_tag(basedir, repo, tag, dry_run)
 
 
-def get_os_release():
+def get_os_release() -> dict[str, str]:
     '''Get OS release'''
     with open("/etc/os-release", encoding="utf-8") as file:
         return {k: v.strip('"') for k, v in [line.split('=') for line in file.read().splitlines()]}
 
 
-def parse_args():  # pragma: no cover
+def parse_args() -> argparse.Namespace:
     """Parse args"""
-    parser = ArgumentParser()
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         '--dry-run', action='store_true',
         help="Don't remove anything")
