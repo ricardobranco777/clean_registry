@@ -1,7 +1,11 @@
 FILES=*.py tests/*.py
 
 .PHONY: all
-all: flake8 pylint pytest mypy
+all: black flake8 pylint pytest mypy
+
+.PHONY: black
+black:
+	@black --check $(FILES)
 
 .PHONY: flake8
 flake8:

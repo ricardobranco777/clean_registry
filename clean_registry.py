@@ -18,12 +18,12 @@ VERSION = "3.1"
 
 
 def is_container() -> bool:
-    '''Returns True if we're inside a Podman/Docker container, False otherwise.'''
+    """Returns True if we're inside a Podman/Docker container, False otherwise."""
     return os.getenv("container") == "podman" or os.path.isfile("/.dockerenv")
 
 
 def check_name(image: str) -> bool:
-    '''Checks the whole repository:tag name'''
+    """Checks the whole repository:tag name"""
     repo, tag = image.split(":", 1) if ":" in image else (image, "latest")
 
     # From https://github.com/moby/moby/blob/master/image/spec/v1.2.md
@@ -40,16 +40,16 @@ def check_name(image: str) -> bool:
     # Note: Internally, distribution permits multiple dashes and up to 2 underscores as separators.
     # See https://github.com/docker/distribution/blob/master/reference/regexp.go
 
-    tag_valid = len(tag) < 129 and re.match(r'[a-zA-Z0-9_][a-zA-Z0-9_.-]*$', tag)
+    tag_valid = len(tag) < 129 and re.match(r"[a-zA-Z0-9_][a-zA-Z0-9_.-]*$", tag)
     repo_valid = all(
-        re.match(r'[a-z0-9]+(?:(?:[._]|__|[-]*)[a-z0-9]+)*$', path)
+        re.match(r"[a-z0-9]+(?:(?:[._]|__|[-]*)[a-z0-9]+)*$", path)
         for path in repo.split("/")
     )
     return bool(len(image) < 256 and tag_valid and repo_valid)
 
 
 def run_command(command: list[str]) -> int:
-    '''Run command'''
+    """Run command"""
     logging.info("Running %s", shlex.join(command))
     try:
         with subprocess.Popen(
@@ -70,8 +70,10 @@ def run_command(command: list[str]) -> int:
 
 
 def clean_registrydir(images: list[str], dry_run: bool = False) -> None:
-    '''Clean registry'''
-    registry_dir = os.environ.get("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY", "/var/lib/registry")
+    """Clean registry"""
+    registry_dir = os.environ.get(
+        "REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY", "/var/lib/registry"
+    )
     logging.debug("registry directory: %s", registry_dir)
     basedir = f"{registry_dir}/docker/registry/v2/repositories"
     for image in images:
@@ -80,7 +82,7 @@ def clean_registrydir(images: list[str], dry_run: bool = False) -> None:
 
 
 def garbage_collect(dry_run: bool = False) -> None:
-    '''Runs garbage-collect'''
+    """Runs garbage-collect"""
     command = shlex.split("/bin/registry garbage-collect --delete-untagged")
     if dry_run:
         command.append("--dry-run")
@@ -92,7 +94,7 @@ def garbage_collect(dry_run: bool = False) -> None:
 
 
 def remove_dir(directory: str, dry_run: bool = False) -> None:
-    '''Run rmtree() in verbose mode'''
+    """Run rmtree() in verbose mode"""
     if dry_run:
         logging.info("directory %s skipped due to dry-run", directory)
         return
@@ -101,7 +103,7 @@ def remove_dir(directory: str, dry_run: bool = False) -> None:
 
 
 def clean_tag(basedir: str, repo: str, tag: str, dry_run: bool = False) -> None:
-    '''Clean a specific repo:tag'''
+    """Clean a specific repo:tag"""
     if not os.path.isfile(f"{basedir}/{repo}/_manifests/tags/{tag}/current/link"):
         logging.error("No such tag: %s in repository %s", tag, repo)
         return
@@ -109,7 +111,7 @@ def clean_tag(basedir: str, repo: str, tag: str, dry_run: bool = False) -> None:
 
 
 def clean_repo(basedir: str, image: str, dry_run: bool = False) -> None:
-    '''Clean all tags (or a specific one, if specified) from a specific repository'''
+    """Clean all tags (or a specific one, if specified) from a specific repository"""
     repo, tag = image.split(":", 1) if ":" in image else (image, "")
     if not os.path.isdir(f"{basedir}/{repo}"):
         logging.error("No such repository: %s", repo)
@@ -123,40 +125,48 @@ def clean_repo(basedir: str, image: str, dry_run: bool = False) -> None:
 
 
 def get_os_release() -> dict[str, str]:
-    '''Get OS release'''
+    """Get OS release"""
     with open("/etc/os-release", encoding="utf-8") as file:
-        return {k: v.strip('"') for k, v in [line.split('=') for line in file.read().splitlines()]}
+        return {
+            k: v.strip('"')
+            for k, v in [line.split("=") for line in file.read().splitlines()]
+        }
 
 
 def parse_args() -> argparse.Namespace:
     """Parse args"""
     parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true", help="Don't remove anything")
     parser.add_argument(
-        '--dry-run', action='store_true',
-        help="Don't remove anything")
+        "-l",
+        "--log",
+        default="info",
+        choices="debug info warning error critical".split(),
+        help="Log level (default is info)",
+    )
     parser.add_argument(
-        '-l', '--log', default='info',
-        choices='debug info warning error critical'.split(),
-        help="Log level (default is info)")
-    parser.add_argument(
-        '-V', '--version', action='store_true',
-        help="Show version and exit")
-    parser.add_argument('images', nargs='*', help="REPOSITORY:[TAG]")
+        "-V", "--version", action="store_true", help="Show version and exit"
+    )
+    parser.add_argument("images", nargs="*", help="REPOSITORY:[TAG]")
     return parser.parse_args()
 
 
 def main():
-    '''Main function'''
+    """Main function"""
     if not is_container() or not os.path.isfile("/bin/registry"):
         sys.exit("ERROR: This script should run inside a registry:2 container!")
 
     args = parse_args()
     if args.version:
-        print(f'{os.path.basename(sys.argv[0])} {VERSION}')
-        print(f'Python {sys.version}')
-        print(subprocess.check_output(shlex.split("/bin/registry --version")).decode("utf-8").strip())
+        print(f"{os.path.basename(sys.argv[0])} {VERSION}")
+        print(f"Python {sys.version}")
+        print(
+            subprocess.check_output(shlex.split("/bin/registry --version"))
+            .decode("utf-8")
+            .strip()
+        )
         osrel = get_os_release()
-        print(osrel['NAME'], osrel['VERSION_ID'])
+        print(osrel["NAME"], osrel["VERSION_ID"])
         sys.exit(0)
 
     for image in args.images:
