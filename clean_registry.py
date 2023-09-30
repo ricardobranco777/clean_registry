@@ -40,9 +40,9 @@ def check_name(image: str) -> bool:
     # Note: Internally, distribution permits multiple dashes and up to 2 underscores as separators.
     # See https://github.com/docker/distribution/blob/master/reference/regexp.go
 
-    tag_valid = len(tag) < 129 and re.match(r"[a-zA-Z0-9_][a-zA-Z0-9_.-]*$", tag)
+    tag_valid = len(tag) < 129 and re.fullmatch(r"[a-zA-Z0-9_][a-zA-Z0-9_.-]*", tag)
     repo_valid = all(
-        re.match(r"[a-z0-9]+(?:(?:[._]|__|[-]*)[a-z0-9]+)*$", path)
+        re.fullmatch(r"[a-z0-9]+(?:(?:[._]|__|[-]*)[a-z0-9]+)*", path)
         for path in repo.split("/")
     )
     return bool(len(image) < 256 and tag_valid and repo_valid)
