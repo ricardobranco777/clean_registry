@@ -29,7 +29,7 @@ docker run --rm -v REGISTRY_DIRECTORY:/var/lib/registry ghcr.io/ricardobranco777
 
 - The `--delete-untagged` option added to [Docker Registry](https://github.com/distribution/distribution) does NOT work with multi-arch images as noted in this [bug](https://github.com/distribution/distribution/issues/3178).  The only workaround is to avoid multi-arch images completely and append the architecture name to the tag instead.
 - Do NOT use it with sigstore/cosign as they [hijack](https://github.com/sigstore/cosign#registry-api-changes) the Registry API in the most obnoxious way by storing signatures as tags, also breaking in the process every registry listing tool.
-- It should work with `--volumes-from REGISTRY_CONTAINER` if the volume is mounted in `/var/lib/registry`.  Beware that this option may be [buggy in Podman](https://github.com/containers/podman/issues/19529).
+- It should work with `--volumes-from REGISTRY_CONTAINER` if the volume is mounted in `/var/lib/registry`.  Beware that this option may be [buggy in Podman < 4.7.0](https://github.com/containers/podman/issues/19529).
 
 ## Examples
 
