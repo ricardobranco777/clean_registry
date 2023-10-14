@@ -14,7 +14,7 @@ import subprocess
 from shutil import rmtree
 
 
-VERSION = "3.1"
+VERSION = "3.1.1"
 
 
 def is_container() -> bool:
