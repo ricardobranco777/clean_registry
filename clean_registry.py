@@ -124,29 +124,18 @@ def clean_repo(basedir: str, image: str, dry_run: bool = False) -> None:
         clean_tag(basedir, repo, tag, dry_run)
 
 
-def get_os_release() -> dict[str, str]:
-    """Get OS release"""
-    with open("/etc/os-release", encoding="utf-8") as file:
-        return {
-            k: v.strip('"')
-            for k, v in [line.split("=") for line in file.read().splitlines()]
-        }
-
-
 def parse_args() -> argparse.Namespace:
     """Parse args"""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dry-run", action="store_true", help="Don't remove anything")
+    parser.add_argument("--dry-run", action="store_true", help="don't remove anything")
     parser.add_argument(
         "-l",
         "--log",
         default="info",
         choices="debug info warning error critical".split(),
-        help="Log level (default is info)",
+        help="log level (default is info)",
     )
-    parser.add_argument(
-        "-V", "--version", action="store_true", help="Show version and exit"
-    )
+    parser.add_argument("--version", action="version", version=VERSION)
     parser.add_argument("images", nargs="*", help="REPOSITORY:[TAG]")
     return parser.parse_args()
 
@@ -157,17 +146,6 @@ def main():
         sys.exit("ERROR: This script should run inside a registry:2 container!")
 
     args = parse_args()
-    if args.version:
-        print(f"{os.path.basename(sys.argv[0])} {VERSION}")
-        print(f"Python {sys.version}")
-        print(
-            subprocess.check_output(shlex.split("/bin/registry --version"))
-            .decode("utf-8")
-            .strip()
-        )
-        osrel = get_os_release()
-        print(osrel["NAME"], osrel["VERSION_ID"])
-        sys.exit(0)
 
     for image in args.images:
         if not check_name(image):

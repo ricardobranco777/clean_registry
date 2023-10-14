@@ -12,7 +12,6 @@ from clean_registry import (
     clean_repo,
     remove_dir,
     garbage_collect,
-    get_os_release,
     main,
 )
 
@@ -428,32 +427,6 @@ def test_garbage_collect_failed_command(mock_run_command, caplog):
     )
     mock_run_command.assert_called_once_with(expected_command)
     assert "Command returned 1" in caplog.text
-
-
-def test_get_os_release_quotes(mocker):
-    mock_open_file = mocker.patch(
-        "builtins.open",
-        mocker.mock_open(read_data='NAME="Alpine Linux"\nVERSION_ID="3.14"'),
-    )
-
-    result = get_os_release()
-
-    assert result == {"NAME": "Alpine Linux", "VERSION_ID": "3.14"}
-
-    mock_open_file.assert_called_once_with("/etc/os-release", encoding="utf-8")
-
-
-def test_get_os_release_noquotes(mocker):
-    mock_open_file = mocker.patch(
-        "builtins.open",
-        mocker.mock_open(read_data='NAME="Alpine Linux"\nVERSION_ID=3.14'),
-    )
-
-    result = get_os_release()
-
-    assert result == {"NAME": "Alpine Linux", "VERSION_ID": "3.14"}
-
-    mock_open_file.assert_called_once_with("/etc/os-release", encoding="utf-8")
 
 
 def test_main_with_invalid_image(mocker):
