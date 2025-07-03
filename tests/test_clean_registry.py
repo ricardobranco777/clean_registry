@@ -494,7 +494,7 @@ def test_main_outside_container(mocker):
         main()
     assert exc.type == SystemExit
     assert (
-        str(exc.value) == "ERROR: This script should run inside a registry:2 container!"
+        str(exc.value) == "ERROR: This script should run inside a registry:3 container!"
     )
 
     assert not mock_clean_registrydir.called

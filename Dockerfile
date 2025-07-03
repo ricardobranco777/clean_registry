@@ -1,4 +1,4 @@
-FROM	registry:2
+FROM	registry:3
 
 RUN	apk --no-cache add python3
 
