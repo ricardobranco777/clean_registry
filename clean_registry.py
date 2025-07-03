@@ -26,6 +26,7 @@ def check_name(image: str) -> bool:
     """Checks the whole repository:tag name"""
     repo, tag = image.split(":", 1) if ":" in image else (image, "latest")
 
+    # From https://github.com/moby/docker-image-spec/blob/v1.2.0/v1.2.md
     # From https://github.com/moby/moby/blob/master/image/spec/v1.2.md
     # Tag values are limited to the set of characters [a-zA-Z0-9_.-], except they may not start with a . or - character.
     # Tags are limited to 128 characters.
@@ -86,7 +87,10 @@ def garbage_collect(dry_run: bool = False) -> None:
     command = shlex.split("/bin/registry garbage-collect --delete-untagged")
     if dry_run:
         command.append("--dry-run")
-    command.append("/etc/docker/registry/config.yml")
+    config_yml = "/etc/docker/registry/config.yml"
+    if os.path.exists("/etc/distribution/config.yml"):
+        config_yml = "/etc/distribution/config.yml"
+    command.append(config_yml)
     logging.debug("Running %s", shlex.join(command))
     status = run_command(command)
     if status != 0:
@@ -143,7 +147,7 @@ def parse_args() -> argparse.Namespace:
 def main():
     """Main function"""
     if not is_container() or not os.path.isfile("/bin/registry"):
-        sys.exit("ERROR: This script should run inside a registry:2 container!")
+        sys.exit("ERROR: This script should run inside a registry:3 container!")
 
     args = parse_args()
 

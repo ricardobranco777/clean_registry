@@ -42,7 +42,7 @@ for runtime in docker podman ; do
 
 	mkdir "$directory"
 	# REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY is needed because of https://github.com/containers/podman/issues/19529
-	"$runtime" run -d --name "$registry" -e REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/var/registry -p "$random_port:5000" -v "$directory:/var/registry" registry:2
+	"$runtime" run -d --name "$registry" -e REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/var/registry -p "$random_port:5000" -v "$directory:/var/registry" registry:3
 
 	"$runtime" tag "$scratch" "$regclean:latest"
 	"$runtime" push "${runtime_options[@]}" "$regclean:latest"
